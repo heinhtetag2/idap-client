@@ -308,7 +308,7 @@ export default function Billing() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
-              <tr className="border-b border-[#F4F4F5] text-[#71717A] font-medium bg-[#FAFAFA]">
+              <tr className="border-b border-[#E4E4E7] text-[#52525B] font-medium bg-[#F4F4F5]">
                 <th className="px-6 py-3 font-medium">{t('Date')}</th>
                 <th className="px-6 py-3 font-medium">{t('Description')}</th>
                 <th className="px-6 py-3 font-medium">{t('Status')}</th>

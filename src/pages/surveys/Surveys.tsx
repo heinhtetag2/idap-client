@@ -303,7 +303,7 @@ export default function Surveys() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead>
-                <tr className="border-b border-[#F4F4F5] text-[#71717A] font-medium bg-[#FAFAFA]">
+                <tr className="border-b border-[#E4E4E7] text-[#52525B] font-medium bg-[#F4F4F5]">
                   <th className="pl-6 pr-3 py-4 font-medium w-12">{t('No.')}</th>
                   <th className="pl-3 pr-6 py-4 font-medium">{t('Survey')}</th>
                   <th className="px-6 py-4 font-medium">{t('Responses')}</th>

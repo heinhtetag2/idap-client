@@ -719,7 +719,7 @@ export default function SurveyDetail() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
-              <tr className="border-b border-[#F4F4F5] text-[#71717A] font-medium bg-[#FAFAFA]">
+              <tr className="border-b border-[#E4E4E7] text-[#52525B] font-medium bg-[#F4F4F5]">
                 <th className="px-6 py-4 font-medium">{t('Respondent')}</th>
                 <th className="px-6 py-4 font-medium">{t('Quality')}</th>
                 <th className="px-6 py-4 font-medium">
@@ -831,7 +831,7 @@ export default function SurveyDetail() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-[#F4F4F5] text-[#71717A] font-medium bg-[#FAFAFA]">
+                  <tr className="border-b border-[#E4E4E7] text-[#52525B] font-medium bg-[#F4F4F5]">
                     <th className="px-6 py-4 font-medium">{t('Respondent')}</th>
                     <th className="px-6 py-4 font-medium">{t('Quality')}</th>
                     <th className="px-6 py-4 font-medium">
