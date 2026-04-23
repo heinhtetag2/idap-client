@@ -175,8 +175,8 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-serif text-[#0A0A0A]">{t('Dashboard')}</h1>
-          <p className="text-sm text-[#71717A] mt-1">
+          <h1 className="text-3xl font-serif text-[#1A1A1A]">{t('Dashboard')}</h1>
+          <p className="text-sm text-[#8A8A8A] mt-1">
             {t('Overview of your surveys, responses, and credit activity.')}
           </p>
         </div>
@@ -205,15 +205,15 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.08 }}
-            className="text-left bg-white border border-[#E4E4E7] rounded-md p-5 flex flex-col justify-center shadow-none hover:border-[#D4D4D8] transition-colors group cursor-pointer"
+            className="text-left bg-white border border-[#E3E3E3] rounded-md p-5 flex flex-col justify-center shadow-none hover:border-[#D4D4D4] transition-colors group cursor-pointer"
           >
             <div className="flex justify-between items-start mb-4">
-              <span className="text-sm font-medium text-[#71717A]">{t(stat.title)}</span>
-              <div className="p-2 bg-[#F4F4F5] rounded-md text-[#52525B] group-hover:bg-[#FF3C21] group-hover:text-white transition-colors">
+              <span className="text-sm font-medium text-[#8A8A8A]">{t(stat.title)}</span>
+              <div className="p-2 bg-[#F3F3F3] rounded-md text-[#4A4A4A] group-hover:bg-[#FF3C21] group-hover:text-white transition-colors">
                 <stat.Icon className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-semibold text-[#0A0A0A] tabular-nums">{stat.value}</div>
+            <div className="text-2xl font-semibold text-[#1A1A1A] tabular-nums">{stat.value}</div>
             <div className="text-xs flex items-center gap-1.5 font-medium mt-2">
               {stat.isPositive === true && (
                 <span className="text-[#047857] flex items-center gap-0.5">
@@ -227,9 +227,9 @@ export default function Dashboard() {
                   {stat.trend}
                 </span>
               )}
-              {stat.isPositive === null && <span className="text-[#52525B]">{stat.trend}</span>}
-              <span className="text-[#D4D4D8]">•</span>
-              <span className="text-[#71717A] font-normal">{t(stat.subtitle)}</span>
+              {stat.isPositive === null && <span className="text-[#4A4A4A]">{stat.trend}</span>}
+              <span className="text-[#D4D4D4]">•</span>
+              <span className="text-[#8A8A8A] font-normal">{t(stat.subtitle)}</span>
             </div>
           </motion.button>
         ))}
@@ -242,19 +242,19 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.4 }}
-          className="bg-white border border-[#E4E4E7] rounded-md p-6 shadow-none"
+          className="bg-white border border-[#E3E3E3] rounded-md p-6 shadow-none"
         >
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h2 className="text-base font-semibold text-[#0A0A0A]">
+              <h2 className="text-base font-semibold text-[#1A1A1A]">
                 {t('Response Collection')}
               </h2>
-              <p className="text-xs text-[#71717A] mt-0.5">
+              <p className="text-xs text-[#8A8A8A] mt-0.5">
                 {t('Responses collected')} {t(range.subtitle)}
               </p>
             </div>
             <div className="text-right">
-              <div className="text-xl font-semibold text-[#0A0A0A] tabular-nums">
+              <div className="text-xl font-semibold text-[#1A1A1A] tabular-nums">
                 {responseTotal.toLocaleString()}
               </div>
               <div
@@ -280,31 +280,31 @@ export default function Dashboard() {
                     <stop offset="95%" stopColor="#FF3C21" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F4F4F5" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F3F3" />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tick={{ fontSize: 12, fill: '#8A8A8A' }}
                   dy={10}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tick={{ fontSize: 12, fill: '#8A8A8A' }}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#0A0A0A',
+                    backgroundColor: '#1A1A1A',
                     borderRadius: '6px',
                     border: 'none',
                     color: '#fff',
                     fontSize: '12px',
                   }}
                   itemStyle={{ color: '#fff' }}
-                  labelStyle={{ color: '#A1A1AA' }}
+                  labelStyle={{ color: '#B5B5B5' }}
                   formatter={(value: number) => [`${value} responses`, '']}
-                  cursor={{ stroke: '#E4E4E7', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  cursor={{ stroke: '#E3E3E3', strokeWidth: 1, strokeDasharray: '4 4' }}
                 />
                 <Area
                   type="monotone"
@@ -325,17 +325,17 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.5 }}
-          className="bg-white border border-[#E4E4E7] rounded-md p-6 shadow-none"
+          className="bg-white border border-[#E3E3E3] rounded-md p-6 shadow-none"
         >
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h2 className="text-base font-semibold text-[#0A0A0A]">{t('Credits Spent')}</h2>
-              <p className="text-xs text-[#71717A] mt-0.5">
+              <h2 className="text-base font-semibold text-[#1A1A1A]">{t('Credits Spent')}</h2>
+              <p className="text-xs text-[#8A8A8A] mt-0.5">
                 {t('Survey reward payouts')} {t(range.subtitle)}
               </p>
             </div>
             <div className="text-right">
-              <div className="text-xl font-semibold text-[#0A0A0A] tabular-nums">
+              <div className="text-xl font-semibold text-[#1A1A1A] tabular-nums">
                 {formatCompact(creditsTotal)}
               </div>
               <div
@@ -355,38 +355,38 @@ export default function Dashboard() {
           <div className="h-[260px] w-full min-w-0 min-h-0">
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={range.credits} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F4F4F5" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F3F3" />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tick={{ fontSize: 12, fill: '#8A8A8A' }}
                   dy={10}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tick={{ fontSize: 12, fill: '#8A8A8A' }}
                   tickFormatter={(v: number) => `${v / 1000}K`}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#0A0A0A',
+                    backgroundColor: '#1A1A1A',
                     borderRadius: '6px',
                     border: 'none',
                     color: '#fff',
                     fontSize: '12px',
                   }}
                   itemStyle={{ color: '#fff' }}
-                  labelStyle={{ color: '#A1A1AA' }}
+                  labelStyle={{ color: '#B5B5B5' }}
                   formatter={(value: number) => [formatMnt(value), '']}
-                  cursor={{ fill: '#F4F4F5' }}
+                  cursor={{ fill: '#F3F3F3' }}
                 />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                   {range.credits.map((entry, index) => (
                     <Cell
                       key={`cell-${index}-${entry.name}`}
-                      fill={index === range.credits.length - 1 ? '#FF3C21' : '#E4E4E7'}
+                      fill={index === range.credits.length - 1 ? '#FF3C21' : '#E3E3E3'}
                     />
                   ))}
                 </Bar>
@@ -401,12 +401,12 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.6 }}
-        className="bg-white border border-[#E4E4E7] rounded-md shadow-none overflow-hidden"
+        className="bg-white border border-[#E3E3E3] rounded-md shadow-none overflow-hidden"
       >
         <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold text-[#0A0A0A]">{t('Top Performing Surveys')}</h2>
-            <p className="text-xs text-[#71717A] mt-0.5">
+            <h2 className="text-base font-semibold text-[#1A1A1A]">{t('Top Performing Surveys')}</h2>
+            <p className="text-xs text-[#8A8A8A] mt-0.5">
               {t('Ranked by responses collected')}
             </p>
           </div>
@@ -419,7 +419,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="divide-y divide-[#F4F4F5] border-t border-[#F4F4F5]">
+        <div className="divide-y divide-[#F3F3F3] border-t border-[#F3F3F3]">
           {topSurveys.map((s) => {
             const pct = Math.min(100, Math.round((s.responsesCurrent / Math.max(1, s.responsesTarget)) * 100));
             return (
@@ -429,28 +429,28 @@ export default function Dashboard() {
                 className="w-full grid grid-cols-[1fr_auto_auto_auto] items-center gap-6 px-6 py-4 text-left hover:bg-[#FAFAFA] transition-colors cursor-pointer group"
               >
                 <div className="min-w-0">
-                  <div className="font-medium text-[#0A0A0A] truncate">{s.title}</div>
-                  <div className="text-xs text-[#71717A] mt-0.5">{t(s.category)}</div>
+                  <div className="font-medium text-[#1A1A1A] truncate">{s.title}</div>
+                  <div className="text-xs text-[#8A8A8A] mt-0.5">{t(s.category)}</div>
                 </div>
 
                 <div className="hidden sm:flex flex-col items-start w-40 gap-1.5">
-                  <div className="relative w-full h-1.5 bg-[#F4F4F5] rounded-full overflow-hidden">
+                  <div className="relative w-full h-1.5 bg-[#F3F3F3] rounded-full overflow-hidden">
                     <div
                       className="absolute inset-y-0 left-0 bg-[#FF3C21] rounded-full"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-[#71717A] tabular-nums">
+                  <span className="text-[11px] text-[#8A8A8A] tabular-nums">
                     {s.responsesCurrent}/{s.responsesTarget}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-xs font-medium text-[#52525B] tabular-nums">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-[#4A4A4A] tabular-nums">
                   <Star className="w-3.5 h-3.5 text-[#FF3C21]" fill="#FF3C21" />
                   {s.avgQuality.toFixed(1)}
                 </div>
 
-                <ArrowRight className="w-4 h-4 text-[#A1A1AA] group-hover:text-[#52525B] transition-colors" />
+                <ArrowRight className="w-4 h-4 text-[#B5B5B5] group-hover:text-[#4A4A4A] transition-colors" />
               </button>
             );
           })}

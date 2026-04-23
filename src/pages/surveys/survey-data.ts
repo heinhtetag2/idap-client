@@ -21,6 +21,9 @@ export interface Survey {
   completionRate: number;
   avgQuality: number;
   createdLabel: string;
+
+  /** ISO date string when soft-deleted. Items live in Trash for 30 days. */
+  deletedAt?: string | null;
 }
 
 export const DEMO_SURVEYS: Survey[] = [

@@ -25,13 +25,43 @@ import {
   ArrowUpRight,
   Info,
   LayoutDashboard,
+  Shield,
+  MapPin,
+  ClipboardCheck,
+  TrendingUp,
+  UserCircle2,
+  GraduationCap,
+  Briefcase,
+  Wallet,
+  Copy,
+  Archive,
+  Lock,
+  Rocket,
 } from 'lucide-react';
 import { BrandSelect } from '@/shared/ui/brand-select';
+import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from '@/shared/ui/drawer';
 import { mockQuestionsFor } from '@/shared/lib/mock-questions';
 import { findSurveyById, DEMO_SURVEYS, type Survey as SurveyRecord } from '@/pages/surveys/survey-data';
 
 type QualityTier = 'High' | 'Medium' | 'Low';
 type RewardStatus = 'Earned' | 'Pending' | 'Invalidated';
+
+interface RespondentProfile {
+  /** 1 (Newcomer) – 5 (Elite). Matches TRUST_LEVELS in shared config. */
+  trustLevel: 1 | 2 | 3 | 4 | 5;
+  ageBracket: '18-24' | '25-34' | '35-44' | '45-54' | '55+';
+  gender: 'Female' | 'Male' | 'Other';
+  region: string;
+  /** Sub-region (e.g., "Khoroo 3"). */
+  district: string;
+  education: 'High school' | 'Diploma' | 'Bachelor' | 'Master' | 'Other';
+  employment: 'Full-time' | 'Part-time' | 'Self-employed' | 'Student' | 'Unemployed';
+  /** Monthly household income bracket (MNT). */
+  incomeBracket: string;
+  surveysCompleted: number;
+  avgQualityScore: number; // 0-100 across their history
+  memberSinceLabel: string;
+}
 
 interface Response {
   id: string;
@@ -40,6 +70,7 @@ interface Response {
   rewardStatus: RewardStatus;
   submittedLabel: string;
   answers: Record<string, string>;
+  profile: RespondentProfile;
 }
 
 interface QualityFactor {
@@ -48,14 +79,29 @@ interface QualityFactor {
   passed: boolean;
 }
 
-type QuestionType = 'single' | 'rating' | 'text';
+type QuestionType =
+  | 'single'
+  | 'multi'
+  | 'rating'
+  | 'scale'
+  | 'ranking'
+  | 'date'
+  | 'matrix'
+  | 'text';
 
 interface QuestionDef {
   id: string;
   text: string;
   type: QuestionType;
   options?: string[];
-  /** 10-item deterministic cycle for demo distribution */
+  /** Matrix rows. Columns come from `options`. */
+  rows?: string[];
+  /** 10-item deterministic cycle for demo distribution.
+   *  - single / rating / scale / date / text: plain string
+   *  - multi: comma-separated option labels, e.g. "Videos, Memes"
+   *  - ranking: pipe-separated order, best-to-worst, e.g. "Speed|Price|Brand|Support"
+   *  - matrix: row=col pairs separated by ";", e.g. "Ease=Good; Price=Ok"
+   */
   pattern: string[];
   timeSec: number;
 }
@@ -134,6 +180,70 @@ const QUESTIONS: QuestionDef[] = [
     ],
     timeSec: 23,
   },
+  {
+    id: 'q8',
+    text: 'How likely are you to recommend digital payments to others?',
+    type: 'scale',
+    pattern: ['5', '4', '5', '4', '4', '3', '4', '5', '3', '2'],
+    timeSec: 6,
+  },
+  {
+    id: 'q9',
+    text: 'Rank these features by importance',
+    type: 'ranking',
+    options: ['Security', 'Speed', 'Cashback', 'Design', 'Support'],
+    pattern: [
+      'Security|Speed|Cashback|Design|Support',
+      'Security|Speed|Support|Design|Cashback',
+      'Speed|Security|Cashback|Support|Design',
+      'Security|Cashback|Speed|Support|Design',
+      'Speed|Security|Design|Cashback|Support',
+      'Security|Speed|Support|Cashback|Design',
+      'Speed|Security|Cashback|Design|Support',
+      'Security|Speed|Design|Support|Cashback',
+      'Security|Speed|Cashback|Design|Support',
+      'Speed|Security|Cashback|Support|Design',
+    ],
+    timeSec: 18,
+  },
+  {
+    id: 'q10',
+    text: 'When did you last use a mobile payment?',
+    type: 'date',
+    pattern: [
+      '2026-04-22',
+      '2026-04-21',
+      '2026-04-22',
+      '2026-04-20',
+      '2026-04-18',
+      '2026-04-22',
+      '2026-04-15',
+      '2026-04-19',
+      '2026-04-22',
+      '2026-04-10',
+    ],
+    timeSec: 8,
+  },
+  {
+    id: 'q11',
+    text: 'Rate each aspect of the mobile payment experience',
+    type: 'matrix',
+    options: ['Poor', 'Ok', 'Good', 'Excellent'],
+    rows: ['Ease of use', 'Speed', 'Security', 'Support'],
+    pattern: [
+      'Ease of use=Excellent; Speed=Excellent; Security=Good; Support=Good',
+      'Ease of use=Good; Speed=Excellent; Security=Good; Support=Ok',
+      'Ease of use=Excellent; Speed=Good; Security=Excellent; Support=Good',
+      'Ease of use=Good; Speed=Good; Security=Good; Support=Ok',
+      'Ease of use=Excellent; Speed=Excellent; Security=Good; Support=Good',
+      'Ease of use=Ok; Speed=Good; Security=Ok; Support=Poor',
+      'Ease of use=Good; Speed=Excellent; Security=Excellent; Support=Good',
+      'Ease of use=Excellent; Speed=Good; Security=Good; Support=Ok',
+      'Ease of use=Good; Speed=Good; Security=Excellent; Support=Good',
+      'Ease of use=Excellent; Speed=Excellent; Security=Excellent; Support=Excellent',
+    ],
+    timeSec: 22,
+  },
 ];
 
 function answerForResponse(questionIndex: number, responseIndex: number): string {
@@ -148,28 +258,127 @@ interface Aggregation {
   distribution: Array<{ value: string; count: number; pct: number }>;
   avg?: number;
   texts?: string[];
+  /** Ranking: sorted by avg rank ascending (best first). */
+  rankings?: Array<{ value: string; avgRank: number }>;
+  /** Matrix: per-row distribution across columns. */
+  matrixRows?: Array<{
+    row: string;
+    distribution: Array<{ value: string; count: number; pct: number }>;
+  }>;
+  /** Date: earliest / latest picks. */
+  dateRange?: { first: string; last: string };
 }
 
 function aggregateQuestion(q: QuestionDef, responses: Response[]): Aggregation {
   const total = responses.length;
+
   if (q.type === 'text') {
     const texts = responses.map((r) => r.answers[q.id]).filter((s) => s && s.trim().length > 0) as string[];
     return { type: 'text', total, distribution: [], texts };
   }
-  const counts = new Map<string, number>();
-  responses.forEach((r) => {
-    const a = r.answers[q.id];
-    if (a != null && a !== '') counts.set(a, (counts.get(a) ?? 0) + 1);
-  });
-  if (q.type === 'rating') {
+
+  if (q.type === 'multi') {
+    const counts = new Map<string, number>();
+    responses.forEach((r) => {
+      const a = r.answers[q.id];
+      if (!a) return;
+      a.split(',').map((s) => s.trim()).filter(Boolean).forEach((opt) => {
+        counts.set(opt, (counts.get(opt) ?? 0) + 1);
+      });
+    });
+    const distribution = (q.options ?? []).map((opt) => {
+      const count = counts.get(opt) ?? 0;
+      return { value: opt, count, pct: total > 0 ? (count / total) * 100 : 0 };
+    });
+    return { type: 'multi', total, distribution };
+  }
+
+  if (q.type === 'rating' || q.type === 'scale') {
+    const counts = new Map<string, number>();
+    responses.forEach((r) => {
+      const a = r.answers[q.id];
+      if (a != null && a !== '') counts.set(a, (counts.get(a) ?? 0) + 1);
+    });
     const sum = responses.reduce((acc, r) => acc + Number(r.answers[q.id] ?? 0), 0);
     const avg = total > 0 ? sum / total : 0;
     const distribution = ['5', '4', '3', '2', '1'].map((v) => {
       const count = counts.get(v) ?? 0;
       return { value: v, count, pct: total > 0 ? (count / total) * 100 : 0 };
     });
-    return { type: 'rating', total, distribution, avg };
+    return { type: q.type, total, distribution, avg };
   }
+
+  if (q.type === 'ranking') {
+    const options = q.options ?? [];
+    const sum = new Map<string, number>();
+    const n = new Map<string, number>();
+    responses.forEach((r) => {
+      const a = r.answers[q.id];
+      if (!a) return;
+      const order = a.split('|').map((s) => s.trim()).filter(Boolean);
+      order.forEach((opt, idx) => {
+        sum.set(opt, (sum.get(opt) ?? 0) + (idx + 1));
+        n.set(opt, (n.get(opt) ?? 0) + 1);
+      });
+    });
+    const rankings = options
+      .map((opt) => {
+        const c = n.get(opt) ?? 0;
+        const s = sum.get(opt) ?? 0;
+        return { value: opt, avgRank: c > 0 ? s / c : options.length };
+      })
+      .sort((a, b) => a.avgRank - b.avgRank);
+    return { type: 'ranking', total, distribution: [], rankings };
+  }
+
+  if (q.type === 'date') {
+    const picks = responses
+      .map((r) => r.answers[q.id])
+      .filter((s) => s && s.length > 0) as string[];
+    const counts = new Map<string, number>();
+    picks.forEach((d) => counts.set(d, (counts.get(d) ?? 0) + 1));
+    const distribution = Array.from(counts.entries())
+      .map(([value, count]) => ({ value, count, pct: total > 0 ? (count / total) * 100 : 0 }))
+      .sort((a, b) => b.count - a.count);
+    const sorted = [...picks].sort();
+    const dateRange = picks.length > 0
+      ? { first: sorted[0], last: sorted[sorted.length - 1] }
+      : undefined;
+    return { type: 'date', total, distribution, dateRange };
+  }
+
+  if (q.type === 'matrix') {
+    const rows = q.rows ?? [];
+    const cols = q.options ?? [];
+    const matrixRows = rows.map((row) => {
+      const counts = new Map<string, number>();
+      let rowTotal = 0;
+      responses.forEach((r) => {
+        const a = r.answers[q.id];
+        if (!a) return;
+        const pairs = a.split(';').map((s) => s.trim()).filter(Boolean);
+        const match = pairs.find((p) => p.split('=')[0].trim() === row);
+        if (!match) return;
+        const col = match.split('=')[1]?.trim();
+        if (!col) return;
+        counts.set(col, (counts.get(col) ?? 0) + 1);
+        rowTotal += 1;
+      });
+      const distribution = cols.map((col) => {
+        const count = counts.get(col) ?? 0;
+        return { value: col, count, pct: rowTotal > 0 ? (count / rowTotal) * 100 : 0 };
+      });
+      return { row, distribution };
+    });
+    return { type: 'matrix', total, distribution: [], matrixRows };
+  }
+
+  // single choice
+  const counts = new Map<string, number>();
+  responses.forEach((r) => {
+    const a = r.answers[q.id];
+    if (a != null && a !== '') counts.set(a, (counts.get(a) ?? 0) + 1);
+  });
   const distribution = (q.options ?? []).map((opt) => {
     const count = counts.get(opt) ?? 0;
     return { value: opt, count, pct: total > 0 ? (count / total) * 100 : 0 };
@@ -212,6 +421,51 @@ function submittedLabel(index: number): string {
   return days === 1 ? 'about 1 day ago' : `${days} days ago`;
 }
 
+const AGE_BRACKETS: RespondentProfile['ageBracket'][] = ['18-24', '25-34', '35-44', '45-54', '55+'];
+const GENDERS: RespondentProfile['gender'][] = ['Female', 'Male', 'Other'];
+const REGIONS = ['Ulaanbaatar', 'Darkhan', 'Erdenet', 'Choibalsan', 'Khovd'];
+const DISTRICTS = ['Khoroo 1', 'Khoroo 3', 'Khoroo 7', 'Khoroo 12', 'Central', 'North', 'South'];
+const EDUCATIONS: RespondentProfile['education'][] = ['High school', 'Diploma', 'Bachelor', 'Master', 'Other'];
+const EMPLOYMENTS: RespondentProfile['employment'][] = ['Full-time', 'Part-time', 'Self-employed', 'Student', 'Unemployed'];
+const INCOME_BRACKETS = [
+  'Under ₮500K',
+  '₮500K – 1M',
+  '₮1M – 2M',
+  '₮2M – 3M',
+  '₮3M+',
+  'Prefer not to say',
+];
+const MEMBERSHIP_LABELS = [
+  '3 months',
+  '6 months',
+  '11 months',
+  '1 year',
+  '1 year 4 months',
+  '2 years',
+  '2 years 6 months',
+];
+
+function profileFor(index: number, quality: QualityTier): RespondentProfile {
+  // Deterministic but varied pseudo-data keyed off the response index.
+  const trustCycle: RespondentProfile['trustLevel'][] = [2, 3, 4, 3, 5, 2, 4, 1, 3, 5];
+  const base = quality === 'High' ? 78 : quality === 'Medium' ? 58 : 34;
+  const jitter = ((index * 13) % 11) - 5;
+  const avgQualityScore = Math.max(0, Math.min(100, base + jitter));
+  return {
+    trustLevel: trustCycle[index % trustCycle.length],
+    ageBracket: AGE_BRACKETS[(index * 3 + 1) % AGE_BRACKETS.length],
+    gender: GENDERS[(index * 5) % GENDERS.length],
+    region: REGIONS[(index * 7 + 2) % REGIONS.length],
+    district: DISTRICTS[(index * 4 + 3) % DISTRICTS.length],
+    education: EDUCATIONS[(index * 2 + 4) % EDUCATIONS.length],
+    employment: EMPLOYMENTS[(index * 3 + 2) % EMPLOYMENTS.length],
+    incomeBracket: INCOME_BRACKETS[(index * 5 + 1) % INCOME_BRACKETS.length],
+    surveysCompleted: 4 + ((index * 11) % 93),
+    avgQualityScore,
+    memberSinceLabel: MEMBERSHIP_LABELS[(index * 2 + 1) % MEMBERSHIP_LABELS.length],
+  };
+}
+
 function generateResponses(count: number): Response[] {
   return Array.from({ length: count }, (_, i) => {
     const first = FIRST_NAMES[i % FIRST_NAMES.length];
@@ -228,6 +482,7 @@ function generateResponses(count: number): Response[] {
       rewardStatus: STATUS_FOR_QUALITY[quality],
       submittedLabel: submittedLabel(i),
       answers,
+      profile: profileFor(i, quality),
     };
   });
 }
@@ -287,9 +542,9 @@ function formatMnt(n: number) {
 
 function qualityBadge(q: QualityTier) {
   switch (q) {
-    case 'High':   return 'bg-[#ECFDF5] text-[#047857] border border-[#D1FAE5]';
-    case 'Medium': return 'bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]';
-    case 'Low':    return 'bg-[#FEF2F2] text-[#991B1B] border border-[#F5D5D5]';
+    case 'High':   return 'bg-[#ECFDF5] text-[#047857]';
+    case 'Medium': return 'bg-[#FFFBEB] text-[#B45309]';
+    case 'Low':    return 'bg-[#FEF2F2] text-[#991B1B]';
   }
 }
 
@@ -304,7 +559,7 @@ function rewardStatusDisplay(s: RewardStatus) {
   }
 }
 
-type DetailStatus = 'Active' | 'Paused';
+type DetailStatus = 'Active' | 'Paused' | 'Draft' | 'Completed';
 
 interface SurveyDetailData {
   id: string;
@@ -330,12 +585,10 @@ interface SurveyDetailData {
 
 function buildInitialSurvey(id: string | undefined): SurveyDetailData {
   const source: SurveyRecord = findSurveyById(id) ?? DEMO_SURVEYS[0];
-  // The detail page only toggles between Active and Paused; treat other lifecycle states as Active for the button
-  const status: DetailStatus = source.status === 'Paused' ? 'Paused' : 'Active';
   return {
     id: source.id,
     title: source.title,
-    status,
+    status: source.status as DetailStatus,
     category: source.category,
     questionCount: QUESTIONS.length,
     estMinutes: source.lengthMinutes,
@@ -453,9 +706,20 @@ export default function SurveyDetail() {
   const pct = Math.round((survey.responsesCurrent / survey.responsesTarget) * 100);
   const spotsRemaining = survey.responsesTarget - survey.responsesCurrent;
   const isActive = survey.status === 'Active';
+  const isPaused = survey.status === 'Paused';
+  const isLive = isActive || isPaused;
+  const isDraft = survey.status === 'Draft';
+  const isCompleted = survey.status === 'Completed';
+  const [graceWindow, setGraceWindow] = useState<'now' | '30m' | '24h'>('30m');
 
   const togglePause = () => {
-    setSurvey((s) => ({ ...s, status: s.status === 'Active' ? 'Paused' : 'Active' }));
+    setSurvey((s) =>
+      s.status === 'Active'
+        ? { ...s, status: 'Paused' }
+        : s.status === 'Paused'
+        ? { ...s, status: 'Active' }
+        : s,
+    );
   };
 
   const handleEdit = () => {
@@ -472,6 +736,27 @@ export default function SurveyDetail() {
           endDate: survey.endDate,
           anonymous: survey.anonymous,
           questions: mockQuestionsFor(survey.category),
+          status: survey.status,
+          responsesCurrent: survey.responsesCurrent,
+        },
+      },
+    });
+  };
+
+  const handleClone = () => {
+    navigate('/surveys/new', {
+      state: {
+        prefill: {
+          title: `${survey.title} (copy)`,
+          description: survey.description,
+          category: survey.category,
+          reward: survey.rewardPerResponse,
+          maxResponses: survey.responsesTarget,
+          estMinutes: survey.estMinutes,
+          trustLevel: survey.trustLevel,
+          endDate: survey.endDate,
+          anonymous: survey.anonymous,
+          questions: mockQuestionsFor(survey.category),
         },
       },
     });
@@ -479,13 +764,16 @@ export default function SurveyDetail() {
 
   const handleDelete = () => {
     setIsDeleteOpen(false);
+    setGraceWindow('30m');
     navigate('/surveys');
   };
 
-  const statusBadge =
-    survey.status === 'Active'
-      ? 'bg-[#ECFDF5] text-[#047857] border border-[#D1FAE5]'
-      : 'bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]';
+  const statusBadge: Record<DetailStatus, string> = {
+    Active: 'bg-[#ECFDF5] text-[#047857]',
+    Paused: 'bg-[#FFFBEB] text-[#B45309]',
+    Draft: 'bg-[#F3F3F3] text-[#8A8A8A]',
+    Completed: 'bg-[#EFF6FF] text-[#1D4ED8]',
+  };
 
   return (
     <motion.div
@@ -495,47 +783,50 @@ export default function SurveyDetail() {
       className="w-full px-6 md:px-8 xl:px-12 py-8 bg-[#FAFAFA]"
     >
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-[#71717A] mb-2">
+      <nav className="flex items-center gap-2 text-sm text-[#8A8A8A] mb-2">
         <button
           onClick={() => navigate('/surveys')}
-          className="font-normal hover:text-[#0A0A0A] transition-colors cursor-pointer"
+          className="font-normal hover:text-[#1A1A1A] transition-colors cursor-pointer"
         >
           {t('Surveys')}
         </button>
-        <span className="text-[#D4D4D8]">/</span>
-        <span className="text-[#0A0A0A] font-medium">{t(survey.title)}</span>
+        <span className="text-[#D4D4D4]">/</span>
+        <span className="text-[#1A1A1A] font-medium">{t(survey.title)}</span>
       </nav>
 
       {/* Page header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-3xl font-serif text-[#0A0A0A]">{t(survey.title)}</h1>
-            <span className={`inline-flex items-center px-2.5 py-0.5 text-[11px] font-medium tracking-wide rounded-full ${statusBadge}`}>
+            <h1 className="text-3xl font-serif text-[#1A1A1A]">{t(survey.title)}</h1>
+            <span className={`inline-flex items-center px-2.5 py-0.5 text-[11px] font-medium tracking-wide rounded-full ${statusBadge[survey.status]}`}>
               {t(survey.status)}
             </span>
           </div>
-          <p className="text-sm text-[#71717A] flex items-center gap-1.5 flex-wrap">
+          <p className="text-sm text-[#8A8A8A] flex items-center gap-1.5 flex-wrap">
             <span>{t(survey.category)}</span>
-            <span className="text-[#D4D4D8]">·</span>
+            <span className="text-[#D4D4D4]">·</span>
             <span>{survey.questionCount} {t('Questions')}</span>
-            <span className="text-[#D4D4D8]">·</span>
+            <span className="text-[#D4D4D4]">·</span>
             <span className="inline-flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-[#71717A]" />
+              <Clock className="w-3.5 h-3.5 text-[#8A8A8A]" />
               {survey.estMinutes} {t('Min')}
             </span>
           </p>
         </div>
 
         <div className="flex gap-2">
+          {/* Edit — available for Draft, Active, Paused (with locks) and Completed (read-only view) */}
           <button
             onClick={handleEdit}
-            className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] rounded-md text-sm font-medium text-[#0A0A0A] hover:bg-[#F4F4F5] transition-colors bg-white shadow-none cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 border border-[#E3E3E3] rounded-md text-sm font-medium text-[#1A1A1A] hover:bg-[#F3F3F3] transition-colors bg-white shadow-none cursor-pointer"
           >
             <Pencil className="w-4 h-4" />
-            {t('Edit')}
+            {isCompleted ? t('View') : t('Edit')}
           </button>
-          {isActive ? (
+
+          {/* Status-specific primary action */}
+          {isActive && (
             <button
               onClick={togglePause}
               className="flex items-center gap-2 px-4 py-2 border border-[#FDE68A] rounded-md text-sm font-medium text-[#B45309] bg-[#FFFBEB] hover:bg-[#FFE8CC] transition-colors shadow-none cursor-pointer"
@@ -543,7 +834,8 @@ export default function SurveyDetail() {
               <Pause className="w-4 h-4" />
               {t('Pause')}
             </button>
-          ) : (
+          )}
+          {isPaused && (
             <button
               onClick={togglePause}
               className="flex items-center gap-2 px-4 py-2 border border-[#D1FAE5] rounded-md text-sm font-medium text-[#047857] bg-[#ECFDF5] hover:bg-[#D5E8D2] transition-colors shadow-none cursor-pointer"
@@ -552,10 +844,30 @@ export default function SurveyDetail() {
               {t('Resume')}
             </button>
           )}
+          {isDraft && (
+            <button
+              onClick={() => navigate('/surveys')}
+              className="flex items-center gap-2 px-4 py-2 bg-[#FF3C21] rounded-md text-sm font-medium text-white hover:bg-[#E63419] transition-colors shadow-none cursor-pointer"
+            >
+              <Rocket className="w-4 h-4" />
+              {t('Publish')}
+            </button>
+          )}
+          {isCompleted && (
+            <button
+              onClick={handleClone}
+              className="flex items-center gap-2 px-4 py-2 border border-[#E3E3E3] rounded-md text-sm font-medium text-[#1A1A1A] hover:bg-[#F3F3F3] transition-colors bg-white shadow-none cursor-pointer"
+            >
+              <Copy className="w-4 h-4" />
+              {t('Clone as new draft')}
+            </button>
+          )}
+
+          {/* Trash / End — always present but its modal adapts to status */}
           <button
             onClick={() => setIsDeleteOpen(true)}
-            className="flex items-center justify-center w-9 h-9 border border-[#E4E4E7] rounded-md text-[#DC2626] bg-white hover:bg-[#FEF2F2] transition-colors shadow-none cursor-pointer"
-            title={t('Delete')}
+            className="flex items-center justify-center w-9 h-9 border border-[#E3E3E3] rounded-md text-[#DC2626] bg-white hover:bg-[#FEF2F2] transition-colors shadow-none cursor-pointer"
+            title={isLive ? t('End survey') : t('Delete')}
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -563,11 +875,11 @@ export default function SurveyDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-[#E4E4E7] mb-6">
+      <div className="flex gap-1 border-b border-[#E3E3E3] mb-6">
         <button
           onClick={() => setActiveTab('overview')}
           className={`relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-            activeTab === 'overview' ? 'text-[#0A0A0A]' : 'text-[#52525B] hover:text-[#0A0A0A]'
+            activeTab === 'overview' ? 'text-[#1A1A1A]' : 'text-[#4A4A4A] hover:text-[#1A1A1A]'
           }`}
         >
           <LayoutDashboard className="w-4 h-4" />
@@ -577,11 +889,11 @@ export default function SurveyDetail() {
         <button
           onClick={() => setActiveTab('responses')}
           className={`relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-            activeTab === 'responses' ? 'text-[#0A0A0A]' : 'text-[#52525B] hover:text-[#0A0A0A]'
+            activeTab === 'responses' ? 'text-[#1A1A1A]' : 'text-[#4A4A4A] hover:text-[#1A1A1A]'
           }`}
         >
           <Users className="w-4 h-4" />
-          {t('Responses')} <span className="text-[#71717A] font-normal tabular-nums">({allResponses.length})</span>
+          {t('Responses')} <span className="text-[#8A8A8A] font-normal tabular-nums">({allResponses.length})</span>
           {activeTab === 'responses' && <span className="absolute left-0 right-0 -bottom-[1px] h-0.5 bg-[#FF3C21] rounded-full" />}
         </button>
       </div>
@@ -618,36 +930,36 @@ export default function SurveyDetail() {
       {/* Progress + Details */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 mb-6">
         {/* Response Progress */}
-        <div className="bg-white rounded-md border border-[#E4E4E7] p-5">
-          <h2 className="text-base font-semibold text-[#0A0A0A] mb-4">{t('Response Progress')}</h2>
+        <div className="bg-white rounded-md border border-[#E3E3E3] p-5">
+          <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">{t('Response Progress')}</h2>
 
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[#52525B] tabular-nums">
+            <span className="text-sm text-[#4A4A4A] tabular-nums">
               {survey.responsesCurrent} {t('collected')}
             </span>
-            <span className="text-sm font-semibold text-[#0A0A0A] tabular-nums">{pct}%</span>
+            <span className="text-sm font-semibold text-[#1A1A1A] tabular-nums">{pct}%</span>
           </div>
-          <div className="h-2 bg-[#F4F4F5] rounded-full overflow-hidden">
+          <div className="h-2 bg-[#F3F3F3] rounded-full overflow-hidden">
             <div
               className="h-full bg-[#FF3C21] rounded-full transition-[width]"
               style={{ width: `${pct}%` }}
             />
           </div>
-          <p className="text-xs text-[#71717A] mt-2">
+          <p className="text-xs text-[#8A8A8A] mt-2">
             {spotsRemaining} {t('spots remaining')}
           </p>
 
-          <div className="mt-5 pt-4 border-t border-[#F4F4F5]">
-            <div className="text-[11px] font-medium text-[#71717A] uppercase tracking-wider mb-2">
+          <div className="mt-5 pt-4 border-t border-[#F3F3F3]">
+            <div className="text-[11px] font-medium text-[#8A8A8A] uppercase tracking-wider mb-2">
               {t('Description')}
             </div>
-            <p className="text-sm text-[#52525B] leading-relaxed">{t(survey.description)}</p>
+            <p className="text-sm text-[#4A4A4A] leading-relaxed">{t(survey.description)}</p>
           </div>
         </div>
 
         {/* Details */}
-        <div className="bg-white rounded-md border border-[#E4E4E7] p-5">
-          <h2 className="text-base font-semibold text-[#0A0A0A] mb-4">{t('Details')}</h2>
+        <div className="bg-white rounded-md border border-[#E3E3E3] p-5">
+          <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">{t('Details')}</h2>
 
           <dl className="space-y-3 text-sm">
             <DetailRow label={t('Reward per response')} value={formatMnt(survey.rewardPerResponse)} />
@@ -658,7 +970,7 @@ export default function SurveyDetail() {
               value={
                 <>
                   {format(new Date(survey.createdAt), 'MMM d, yyyy')}{' '}
-                  <span className="text-[#71717A] font-normal">({t(survey.createdLabel)})</span>
+                  <span className="text-[#8A8A8A] font-normal">({t(survey.createdLabel)})</span>
                 </>
               }
             />
@@ -667,7 +979,7 @@ export default function SurveyDetail() {
               value={
                 <>
                   {format(new Date(survey.endDate), 'MMM d, yyyy')}{' '}
-                  <span className="text-[#71717A] font-normal">({t(survey.endsLabel)})</span>
+                  <span className="text-[#8A8A8A] font-normal">({t(survey.endsLabel)})</span>
                 </>
               }
             />
@@ -676,17 +988,17 @@ export default function SurveyDetail() {
       </div>
 
       {/* Question Summary */}
-      <div className="bg-white rounded-md border border-[#E4E4E7] overflow-hidden mb-6">
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-[#F4F4F5]">
-          <h2 className="text-base font-semibold text-[#0A0A0A]">{t('Question Summary')}</h2>
+      <div className="bg-white rounded-md border border-[#E3E3E3] overflow-hidden mb-6">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-[#F3F3F3]">
+          <h2 className="text-base font-semibold text-[#1A1A1A]">{t('Question Summary')}</h2>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-[#71717A]">
+            <span className="text-xs text-[#8A8A8A]">
               {t('Based on')} {allResponses.length} {t('responses')}
             </span>
             <button
               onClick={handleExportSummaryCsv}
               disabled={allResponses.length === 0}
-              className="flex items-center gap-2 h-8 px-3 border border-[#E4E4E7] rounded-md text-sm font-medium text-[#0A0A0A] hover:bg-[#F4F4F5] transition-colors bg-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="flex items-center gap-2 h-8 px-3 border border-[#E3E3E3] rounded-md text-sm font-medium text-[#1A1A1A] hover:bg-[#F3F3F3] transition-colors bg-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <Download className="w-4 h-4" />
               {t('Export CSV')}
@@ -705,12 +1017,12 @@ export default function SurveyDetail() {
       </div>
 
       {/* Recent Responses */}
-      <div className="bg-white rounded-md border border-[#E4E4E7] overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#F4F4F5]">
-          <h2 className="text-base font-semibold text-[#0A0A0A]">{t('Recent Responses')}</h2>
+      <div className="bg-white rounded-md border border-[#E3E3E3] overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#F3F3F3]">
+          <h2 className="text-base font-semibold text-[#1A1A1A]">{t('Recent Responses')}</h2>
           <button
             onClick={() => setActiveTab('responses')}
-            className="text-sm font-medium text-[#0A0A0A] hover:text-[#000000] transition-colors cursor-pointer"
+            className="text-sm font-medium text-[#1A1A1A] hover:text-[#000000] transition-colors cursor-pointer"
           >
             {t('View all')} →
           </button>
@@ -719,21 +1031,21 @@ export default function SurveyDetail() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
-              <tr className="border-b border-[#E4E4E7] text-[#52525B] font-medium bg-[#F4F4F5]">
+              <tr className="border-b border-[#E3E3E3] text-[#8A8A8A] font-medium bg-[#FAFAFA]">
                 <th className="px-6 py-4 font-medium">{t('Respondent')}</th>
                 <th className="px-6 py-4 font-medium">{t('Quality')}</th>
                 <th className="px-6 py-4 font-medium">
                     <span className="inline-flex items-center gap-1.5">
                       {t('Reward Status')}
                       <span title={t('Auto-assigned by quality score — ≥80 instant, 50–79 held 24h, <50 invalidated')} className="inline-flex cursor-help">
-                        <Info className="w-3.5 h-3.5 text-[#D4D4D8] hover:text-[#71717A] transition-colors" />
+                        <Info className="w-3.5 h-3.5 text-[#D4D4D4] hover:text-[#8A8A8A] transition-colors" />
                       </span>
                     </span>
                   </th>
                 <th className="px-6 py-4 font-medium">{t('Submitted')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F4F4F5]">
+            <tbody className="divide-y divide-[#F3F3F3]">
               {allResponses.slice(0, 6).map((r) => {
                 const rs = rewardStatusDisplay(r.rewardStatus);
                 return (
@@ -742,7 +1054,7 @@ export default function SurveyDetail() {
                     className="hover:bg-white transition-colors cursor-pointer"
                     onClick={() => setSelectedResponse(r)}
                   >
-                    <td className="px-6 py-4 text-[#0A0A0A] font-medium">{r.respondent}</td>
+                    <td className="px-6 py-4 text-[#1A1A1A] font-medium">{r.respondent}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 text-[11px] font-medium tracking-wide rounded-full ${qualityBadge(r.quality)}`}>
                         {t(r.quality)}
@@ -754,7 +1066,7 @@ export default function SurveyDetail() {
                         {t(rs.label)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-[#71717A]">{t(r.submittedLabel)}</td>
+                    <td className="px-6 py-4 text-[#8A8A8A]">{t(r.submittedLabel)}</td>
                   </tr>
                 );
               })}
@@ -769,13 +1081,13 @@ export default function SurveyDetail() {
           {/* Filter bar */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center flex-wrap">
             <div className="relative flex-1 max-w-sm w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8A8A]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                 placeholder={t('Search by respondent...')}
-                className="w-full pl-9 pr-4 py-2 bg-white border border-[#E4E4E7] rounded-md text-sm focus:outline-none focus:border-[#FF3C21] focus:ring-1 focus:ring-[#FF3C21] placeholder:text-[#71717A]"
+                className="w-full pl-9 pr-4 py-2 bg-white border border-[#E3E3E3] rounded-md text-sm focus:outline-none focus:border-[#FF3C21] focus:ring-1 focus:ring-[#FF3C21] placeholder:text-[#8A8A8A]"
               />
             </div>
 
@@ -808,7 +1120,7 @@ export default function SurveyDetail() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="flex items-center justify-center w-9 h-9 text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5] rounded-full transition-colors border border-transparent hover:border-[#E4E4E7] shadow-none cursor-pointer flex-shrink-0"
+                className="flex items-center justify-center w-9 h-9 text-[#8A8A8A] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-full transition-colors border border-transparent hover:border-[#E3E3E3] shadow-none cursor-pointer flex-shrink-0"
                 title={t('Clear filters')}
               >
                 <X className="w-4 h-4" />
@@ -818,7 +1130,7 @@ export default function SurveyDetail() {
             <div className="ml-auto">
               <button
                 onClick={handleExportCsv}
-                className="flex items-center gap-2 px-4 py-2 border border-[#E4E4E7] rounded-md text-sm font-medium text-[#0A0A0A] hover:bg-[#F4F4F5] transition-colors bg-white shadow-none cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 border border-[#E3E3E3] rounded-md text-sm font-medium text-[#1A1A1A] hover:bg-[#F3F3F3] transition-colors bg-white shadow-none cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 {t('Export CSV')}
@@ -827,28 +1139,28 @@ export default function SurveyDetail() {
           </div>
 
           {/* Full table */}
-          <div className="bg-white rounded-md border border-[#E4E4E7] overflow-hidden">
+          <div className="bg-white rounded-md border border-[#E3E3E3] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-[#E4E4E7] text-[#52525B] font-medium bg-[#F4F4F5]">
+                  <tr className="border-b border-[#E3E3E3] text-[#8A8A8A] font-medium bg-[#FAFAFA]">
                     <th className="px-6 py-4 font-medium">{t('Respondent')}</th>
                     <th className="px-6 py-4 font-medium">{t('Quality')}</th>
                     <th className="px-6 py-4 font-medium">
                     <span className="inline-flex items-center gap-1.5">
                       {t('Reward Status')}
                       <span title={t('Auto-assigned by quality score — ≥80 instant, 50–79 held 24h, <50 invalidated')} className="inline-flex cursor-help">
-                        <Info className="w-3.5 h-3.5 text-[#D4D4D8] hover:text-[#71717A] transition-colors" />
+                        <Info className="w-3.5 h-3.5 text-[#D4D4D4] hover:text-[#8A8A8A] transition-colors" />
                       </span>
                     </span>
                   </th>
                     <th className="px-6 py-4 font-medium">{t('Submitted')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#F4F4F5]">
+                <tbody className="divide-y divide-[#F3F3F3]">
                   {pageRows.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-[#71717A]">
+                      <td colSpan={4} className="px-6 py-12 text-center text-[#8A8A8A]">
                         {t('No responses match these filters.')}
                       </td>
                     </tr>
@@ -860,7 +1172,7 @@ export default function SurveyDetail() {
                         className="hover:bg-white transition-colors cursor-pointer"
                         onClick={() => setSelectedResponse(r)}
                       >
-                        <td className="px-6 py-4 text-[#0A0A0A] font-medium">{r.respondent}</td>
+                        <td className="px-6 py-4 text-[#1A1A1A] font-medium">{r.respondent}</td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 text-[11px] font-medium tracking-wide rounded-full ${qualityBadge(r.quality)}`}>
                             {t(r.quality)}
@@ -872,7 +1184,7 @@ export default function SurveyDetail() {
                             {t(rs.label)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-[#71717A]">{t(r.submittedLabel)}</td>
+                        <td className="px-6 py-4 text-[#8A8A8A]">{t(r.submittedLabel)}</td>
                       </tr>
                     );
                   })}
@@ -881,21 +1193,21 @@ export default function SurveyDetail() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#F4F4F5] bg-white">
-              <span className="text-sm text-[#71717A]">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-[#F3F3F3] bg-white">
+              <span className="text-sm text-[#8A8A8A]">
                 {t('Showing')} {filteredResponses.length === 0 ? 0 : pageStart + 1} {t('to')} {Math.min(pageStart + pageSize, filteredResponses.length)} {t('of')} {filteredResponses.length} {t('responses')}
               </span>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="h-8 px-3 inline-flex items-center text-sm font-normal border border-[#E4E4E7] rounded-md bg-white text-[#52525B] hover:bg-[#F4F4F5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="h-8 px-3 inline-flex items-center text-sm font-normal border border-[#E3E3E3] rounded-md bg-white text-[#4A4A4A] hover:bg-[#F3F3F3] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {t('Previous')}
                 </button>
                 {getPageNumbers(page, totalPages).map((p, i) =>
                   p === 'ellipsis' ? (
-                    <span key={`e-${i}`} className="px-1 text-sm text-[#71717A]">…</span>
+                    <span key={`e-${i}`} className="px-1 text-sm text-[#8A8A8A]">…</span>
                   ) : (
                     <button
                       key={p}
@@ -903,7 +1215,7 @@ export default function SurveyDetail() {
                       className={`h-8 min-w-8 px-2 inline-flex items-center justify-center text-sm border rounded-md tabular-nums transition-colors ${
                         p === page
                           ? 'font-medium border-[#FF3C21] bg-[#FF3C21] text-white cursor-default'
-                          : 'font-normal border-[#E4E4E7] bg-white text-[#52525B] hover:bg-[#F4F4F5] cursor-pointer'
+                          : 'font-normal border-[#E3E3E3] bg-white text-[#4A4A4A] hover:bg-[#F3F3F3] cursor-pointer'
                       }`}
                     >
                       {p}
@@ -913,7 +1225,7 @@ export default function SurveyDetail() {
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="h-8 px-3 inline-flex items-center text-sm font-normal border border-[#E4E4E7] rounded-md bg-white text-[#52525B] hover:bg-[#F4F4F5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="h-8 px-3 inline-flex items-center text-sm font-normal border border-[#E3E3E3] rounded-md bg-white text-[#4A4A4A] hover:bg-[#F3F3F3] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {t('Next')}
                 </button>
@@ -924,39 +1236,29 @@ export default function SurveyDetail() {
       )}
 
       {/* Response Detail side sheet */}
-      <AnimatePresence>
-        {selectedResponse && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-[#0A0A0A]/30 z-50 flex justify-end"
-            onClick={() => setSelectedResponse(null)}
-          >
-            <motion.aside
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-              className="w-full max-w-md bg-white h-full overflow-y-auto border-l border-[#E4E4E7]"
-              onClick={(e) => e.stopPropagation()}
-            >
+      <Drawer direction="right" open={!!selectedResponse} onOpenChange={(o) => !o && setSelectedResponse(null)}>
+        <DrawerContent className="!max-w-md data-[vaul-drawer-direction=right]:sm:!max-w-md bg-white border-l border-[#E3E3E3]">
+          {selectedResponse && (
+            <div className="flex flex-col h-full overflow-hidden">
               {/* Header */}
-              <div className="sticky top-0 z-10 bg-white px-6 py-4 border-b border-[#E4E4E7] flex items-center justify-between">
+              <div className="px-6 py-4 border-b border-[#E3E3E3] flex items-center justify-between shrink-0">
                 <div>
-                  <h2 className="text-base font-semibold text-[#0A0A0A]">{t('Response Detail')}</h2>
-                  <p className="text-sm text-[#71717A] mt-0.5">{selectedResponse.respondent}</p>
+                  <DrawerTitle className="text-base font-semibold text-[#1A1A1A]">{t('Response Detail')}</DrawerTitle>
+                  <DrawerDescription className="text-sm text-[#8A8A8A] mt-0.5">{selectedResponse.respondent}</DrawerDescription>
                 </div>
                 <button
                   onClick={() => setSelectedResponse(null)}
-                  className="text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5] rounded-md transition-colors p-1 cursor-pointer"
+                  className="text-[#8A8A8A] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-md transition-colors p-1 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Body */}
-              <div className="p-5 space-y-5">
+              {/* Body — scrollable */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {/* Respondent Profile (anonymized) */}
+                <RespondentProfileCard profile={selectedResponse.profile} />
+
                 {/* Quality Score */}
                 {(() => {
                   const score = qualityScoreFor(selectedResponse.quality);
@@ -965,12 +1267,12 @@ export default function SurveyDetail() {
                   const earned = Math.round(baseReward * mult);
                   const totalSec = QUESTIONS.reduce((acc, q) => acc + q.timeSec, 0);
                   return (
-                    <div className="bg-white rounded-md border border-[#E4E4E7] p-5">
+                    <div className="bg-white rounded-md border border-[#E3E3E3] p-5">
                       <div className="flex items-start justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-[#0A0A0A]">{t('Quality Score')}</h3>
-                        <span className="text-3xl font-bold text-[#0A0A0A] tabular-nums leading-none">{score}</span>
+                        <h3 className="text-sm font-semibold text-[#1A1A1A]">{t('Quality Score')}</h3>
+                        <span className="text-3xl font-bold text-[#1A1A1A] tabular-nums leading-none">{score}</span>
                       </div>
-                      <div className="h-2 bg-[#F4F4F5] rounded-full overflow-hidden mb-4">
+                      <div className="h-2 bg-[#F3F3F3] rounded-full overflow-hidden mb-4">
                         <div
                           className={`h-full rounded-full ${score >= 80 ? 'bg-[#047857]' : score >= 50 ? 'bg-[#B45309]' : 'bg-[#DC2626]'}`}
                           style={{ width: `${score}%` }}
@@ -986,38 +1288,38 @@ export default function SurveyDetail() {
                 })()}
 
                 {/* Quality Factors */}
-                <div className="bg-white rounded-md border border-[#E4E4E7] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-[#F4F4F5] bg-white">
-                    <h3 className="text-[11px] font-medium text-[#71717A] uppercase tracking-wider">
+                <div className="bg-white rounded-md border border-[#E3E3E3] overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[#F3F3F3] bg-white">
+                    <h3 className="text-[11px] font-medium text-[#8A8A8A] uppercase tracking-wider">
                       {t('Quality Factors')}
                     </h3>
                   </div>
                   {QUALITY_FACTORS.map((f, i) => (
                     <div
                       key={f.label}
-                      className={`flex items-start gap-3 px-5 py-4 ${i < QUALITY_FACTORS.length - 1 ? 'border-b border-[#F4F4F5]' : ''}`}
+                      className={`flex items-start gap-3 px-5 py-4 ${i < QUALITY_FACTORS.length - 1 ? 'border-b border-[#F3F3F3]' : ''}`}
                     >
                       <CheckCircle2 className="w-5 h-5 text-[#047857] shrink-0 mt-0.5" strokeWidth={1.75} />
                       <div>
-                        <div className="text-sm font-medium text-[#0A0A0A]">{t(f.label)}</div>
-                        <div className="text-xs text-[#71717A] mt-0.5">{t(f.detail)}</div>
+                        <div className="text-sm font-medium text-[#1A1A1A]">{t(f.label)}</div>
+                        <div className="text-xs text-[#8A8A8A] mt-0.5">{t(f.detail)}</div>
                       </div>
                     </div>
                   ))}
                 </div>
 
                 {/* Answers */}
-                <div className="bg-white rounded-md border border-[#E4E4E7] overflow-hidden">
+                <div className="bg-white rounded-md border border-[#E3E3E3] overflow-hidden">
                   <button
                     onClick={() => setIsAnswersOpen((o) => !o)}
-                    className="w-full flex items-center justify-between px-5 py-3 border-b border-[#F4F4F5] bg-white cursor-pointer"
+                    className="w-full flex items-center justify-between px-5 py-3 border-b border-[#F3F3F3] bg-white cursor-pointer"
                   >
-                    <h3 className="text-[11px] font-medium text-[#71717A] uppercase tracking-wider">
+                    <h3 className="text-[11px] font-medium text-[#8A8A8A] uppercase tracking-wider">
                       {t('Answers')} ({QUESTIONS.length} {t('Questions')})
                     </h3>
                     {isAnswersOpen
-                      ? <ChevronUp className="w-4 h-4 text-[#71717A]" />
-                      : <ChevronDown className="w-4 h-4 text-[#71717A]" />}
+                      ? <ChevronUp className="w-4 h-4 text-[#8A8A8A]" />
+                      : <ChevronDown className="w-4 h-4 text-[#8A8A8A]" />}
                   </button>
                   {isAnswersOpen && (
                     <div>
@@ -1026,19 +1328,19 @@ export default function SurveyDetail() {
                         return (
                           <div
                             key={q.id}
-                            className={`p-5 ${i < QUESTIONS.length - 1 ? 'border-b border-[#F4F4F5]' : ''}`}
+                            className={`p-5 ${i < QUESTIONS.length - 1 ? 'border-b border-[#F3F3F3]' : ''}`}
                           >
                             <div className="flex items-start gap-3">
-                              <div className="w-6 h-6 rounded-full bg-[#F4F4F5] text-[#0A0A0A] text-xs font-semibold flex items-center justify-center shrink-0">
+                              <div className="w-6 h-6 rounded-full bg-[#F3F3F3] text-[#1A1A1A] text-xs font-semibold flex items-center justify-center shrink-0">
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm text-[#0A0A0A] mb-2 leading-relaxed">{t(q.text)}</div>
-                                <div className="flex items-start gap-2 text-sm text-[#52525B]">
-                                  <MessageSquare className="w-4 h-4 text-[#71717A] shrink-0 mt-0.5" />
-                                  <span>{answer || <span className="italic text-[#71717A]">{t('(no answer)')}</span>}</span>
+                                <div className="text-sm text-[#1A1A1A] mb-2 leading-relaxed">{t(q.text)}</div>
+                                <div className="flex items-start gap-2 text-sm text-[#4A4A4A]">
+                                  <MessageSquare className="w-4 h-4 text-[#8A8A8A] shrink-0 mt-0.5" />
+                                  <span>{answer || <span className="italic text-[#8A8A8A]">{t('(no answer)')}</span>}</span>
                                 </div>
-                                <div className="text-[11px] text-[#71717A] mt-1 tabular-nums">{q.timeSec}s</div>
+                                <div className="text-[11px] text-[#8A8A8A] mt-1 tabular-nums">{q.timeSec}s</div>
                               </div>
                             </div>
                           </div>
@@ -1048,75 +1350,182 @@ export default function SurveyDetail() {
                   )}
                 </div>
               </div>
-            </motion.aside>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          )}
+        </DrawerContent>
+      </Drawer>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete / End Survey Modal — status-aware */}
       <AnimatePresence>
-        {isDeleteOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-[#0A0A0A]/30 flex items-center justify-center z-50 p-4"
-            onClick={() => setIsDeleteOpen(false)}
-          >
+        {isDeleteOpen && (() => {
+          const locked = survey.responsesTarget * survey.rewardPerResponse;
+          const earned = survey.responsesCurrent * survey.rewardPerResponse;
+          const refund = Math.max(0, locked - earned);
+          const close = () => {
+            setIsDeleteOpen(false);
+            setGraceWindow('30m');
+          };
+
+          return (
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              transition={{ type: 'spring', duration: 0.3 }}
-              className="bg-white rounded-md w-full max-w-sm shadow-none border border-[#F4F4F5] flex flex-col overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={close}
+              className="fixed inset-0 bg-[#1A1A1A]/30 flex items-center justify-center z-50 p-4"
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#F4F4F5] shrink-0">
-                <h2 className="text-lg font-bold text-[#0A0A0A] flex items-center gap-2">
-                  <Trash2 className="w-5 h-5 text-[#DC2626]" />
-                  {t('Delete Survey')}
-                </h2>
-                <button
-                  onClick={() => setIsDeleteOpen(false)}
-                  className="text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5] rounded-md transition-colors p-1 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-6 bg-white">
-                <p className="text-[#52525B] text-sm leading-relaxed">
-                  {t('Are you sure you want to delete this survey? Any in-progress responses will be discarded.')}
-                </p>
-                <div className="mt-3 p-3 bg-white border border-[#E4E4E7] rounded-md">
-                  <div className="font-medium text-[#0A0A0A] text-sm">{t(survey.title)}</div>
-                  <div className="text-[#71717A] text-xs mt-1">
-                    {t(survey.category)} · {survey.responsesCurrent}/{survey.responsesTarget} {t('responses')}
-                  </div>
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                transition={{ type: 'spring', duration: 0.3 }}
+                className="bg-white rounded-md w-full max-w-md shadow-none border border-[#E3E3E3] flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[#F3F3F3] shrink-0">
+                  <h2 className="text-base font-semibold text-[#1A1A1A] flex items-center gap-2">
+                    {isLive ? (
+                      <AlertCircle className="w-5 h-5 text-[#DC2626]" />
+                    ) : (
+                      <Trash2 className="w-5 h-5 text-[#DC2626]" />
+                    )}
+                    {isLive ? t('End survey early') : t('Delete survey')}
+                  </h2>
+                  <button
+                    onClick={close}
+                    className="text-[#8A8A8A] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-md transition-colors p-1 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <p className="mt-4 text-[#DC2626] text-xs font-medium flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4" />
-                  {t('This action cannot be undone.')}
-                </p>
-              </div>
 
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#F4F4F5] bg-white shrink-0">
-                <button
-                  onClick={() => setIsDeleteOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-[#52525B] bg-white border border-[#E4E4E7] rounded-md hover:bg-[#F4F4F5] transition-colors shadow-none cursor-pointer"
-                >
-                  {t('Cancel')}
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 text-sm font-medium text-white bg-[#DC2626] rounded-md hover:bg-[#B91C1C] transition-colors shadow-none cursor-pointer"
-                >
-                  {t('Delete Permanently')}
-                </button>
-              </div>
+                <div className="p-6 bg-white space-y-5">
+                  <div className="p-3 bg-[#FAFAFA] border border-[#E3E3E3] rounded-md">
+                    <div className="font-medium text-[#1A1A1A] text-sm">{t(survey.title)}</div>
+                    <div className="text-[#8A8A8A] text-xs mt-1">
+                      {t(survey.category)} · ₮{survey.rewardPerResponse.toLocaleString('en-US')} · {survey.responsesCurrent}/{survey.responsesTarget} {t('responses')}
+                    </div>
+                  </div>
+
+                  {isLive ? (
+                    <>
+                      <div className="rounded-md border border-[#E3E3E3] divide-y divide-[#F3F3F3]">
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <div>
+                            <div className="text-sm text-[#1A1A1A]">{t('Already paid out')}</div>
+                            <div className="text-xs text-[#8A8A8A] mt-0.5">
+                              {survey.responsesCurrent} {t('completed responses')}
+                            </div>
+                          </div>
+                          <span className="text-sm font-semibold text-[#1A1A1A] tabular-nums">
+                            ₮{earned.toLocaleString('en-US')}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-3 bg-[#ECFDF5]">
+                          <div>
+                            <div className="text-sm font-medium text-[#047857]">
+                              {t('Refunded to your balance')}
+                            </div>
+                            <div className="text-xs text-[#047857]/80 mt-0.5">
+                              {t('Unused locked credits')}
+                            </div>
+                          </div>
+                          <span className="text-sm font-semibold text-[#047857] tabular-nums">
+                            + ₮{refund.toLocaleString('en-US')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isActive && (
+                        <div>
+                          <label className="block text-xs font-medium text-[#4A4A4A] mb-2">
+                            {t('Give in-progress respondents time to finish?')}
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {(
+                              [
+                                { id: 'now', label: t('End now') },
+                                { id: '30m', label: t('30 min') },
+                                { id: '24h', label: t('24 hours') },
+                              ] as const
+                            ).map((opt) => (
+                              <button
+                                key={opt.id}
+                                onClick={() => setGraceWindow(opt.id)}
+                                className={`px-3 py-2 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                                  graceWindow === opt.id
+                                    ? 'border-[#FF3C21] bg-[#FFF1EE] text-[#FF3C21]'
+                                    : 'border-[#E3E3E3] bg-white text-[#4A4A4A] hover:bg-[#F3F3F3]'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <ul className="space-y-2.5 text-xs text-[#4A4A4A]">
+                        <li className="flex items-start gap-2.5">
+                          {graceWindow === 'now' || isPaused ? (
+                            <>
+                              <X className="w-3.5 h-3.5 text-[#DC2626] shrink-0 mt-0.5" />
+                              <span>{t('In-progress responses are discarded and not paid.')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3.5 h-3.5 text-[#8A8A8A] shrink-0 mt-0.5" />
+                              <span>
+                                {graceWindow === '30m'
+                                  ? t('Respondents have 30 minutes to submit. Eligible submissions are paid.')
+                                  : t('Respondents have 24 hours to submit. Eligible submissions are paid.')}
+                              </span>
+                            </>
+                          )}
+                        </li>
+                        <li className="flex items-start gap-2.5">
+                          <Archive className="w-3.5 h-3.5 text-[#8A8A8A] shrink-0 mt-0.5" />
+                          <span>{t('Results stay in your archive — you can still export them.')}</span>
+                        </li>
+                        <li className="flex items-start gap-2.5">
+                          <Lock className="w-3.5 h-3.5 text-[#8A8A8A] shrink-0 mt-0.5" />
+                          <span>{t("The survey can't be reopened.")}</span>
+                        </li>
+                      </ul>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-[#4A4A4A] leading-relaxed">
+                        {isDraft
+                          ? t('This draft will be permanently deleted. No credits or respondents are involved.')
+                          : t('The final report and exports will be deleted. Payouts already made are unaffected.')}
+                      </p>
+                      <p className="text-[#DC2626] text-xs font-medium flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4" />
+                        {t('This action cannot be undone.')}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 px-6 py-4 border-t border-[#F3F3F3] bg-[#FAFAFA] shrink-0">
+                  <button
+                    onClick={close}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-[#4A4A4A] bg-white border border-[#E3E3E3] rounded-md hover:bg-[#F3F3F3] transition-colors cursor-pointer"
+                  >
+                    {t('Cancel')}
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#DC2626] rounded-md hover:bg-[#B91C1C] transition-colors cursor-pointer"
+                  >
+                    {isLive ? t('End survey') : t('Delete permanently')}
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          );
+        })()}
       </AnimatePresence>
     </motion.div>
   );
@@ -1131,18 +1540,18 @@ interface KpiCardProps {
 
 function KpiCard({ icon, iconTone, label, value }: KpiCardProps) {
   const tones: Record<KpiCardProps['iconTone'], string> = {
-    brand: 'bg-[#F4F4F5] text-[#0A0A0A]',
+    brand: 'bg-[#F3F3F3] text-[#1A1A1A]',
     green: 'bg-[#ECFDF5] text-[#047857]',
     amber: 'bg-[#FFFBEB] text-[#B45309]',
     blue:  'bg-[#EFF6FF] text-[#1D4ED8]',
   };
   return (
-    <div className="bg-white rounded-md border border-[#E4E4E7] p-5">
+    <div className="bg-white rounded-md border border-[#E3E3E3] p-5">
       <div className={`w-10 h-10 rounded-md flex items-center justify-center mb-4 ${tones[iconTone]}`}>
         {icon}
       </div>
-      <div className="text-2xl font-bold text-[#0A0A0A] tracking-tight mb-1 tabular-nums">{value}</div>
-      <div className="text-sm text-[#71717A]">{label}</div>
+      <div className="text-2xl font-bold text-[#1A1A1A] tracking-tight mb-1 tabular-nums">{value}</div>
+      <div className="text-sm text-[#8A8A8A]">{label}</div>
     </div>
   );
 }
@@ -1164,8 +1573,18 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
   const [isOpen, setIsOpen] = useState(false);
   const [isTextModalOpen, setIsTextModalOpen] = useState(false);
   const [textSearch, setTextSearch] = useState('');
-  const qTypeLabel =
-    question.type === 'rating' ? 'Rating' : question.type === 'text' ? 'Short Text' : 'Single Choice';
+  const qTypeLabel = (
+    {
+      single: 'Single Choice',
+      multi: 'Multi Choice',
+      rating: 'Rating',
+      scale: 'Scale',
+      ranking: 'Ranking',
+      date: 'Date',
+      matrix: 'Matrix',
+      text: 'Short Text',
+    } as Record<QuestionType, string>
+  )[question.type];
 
   const allTexts = aggregation.texts ?? [];
   const filteredTexts = textSearch
@@ -1173,23 +1592,23 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
     : allTexts;
 
   return (
-    <div className={!isLast ? 'border-b border-[#F4F4F5]' : ''}>
+    <div className={!isLast ? 'border-b border-[#F3F3F3]' : ''}>
       <button
         onClick={() => setIsOpen((o) => !o)}
         aria-expanded={isOpen}
         className="w-full px-6 py-4 text-left hover:bg-white transition-colors cursor-pointer"
       >
         <div className="flex items-start gap-3">
-          <span className="w-6 h-6 rounded-full bg-[#F4F4F5] text-[#0A0A0A] text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">
+          <span className="w-6 h-6 rounded-full bg-[#F3F3F3] text-[#1A1A1A] text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">
             {index + 1}
           </span>
           <div className="flex-1 min-w-0">
-            <div className="text-xs text-[#71717A] mb-0.5">{t(qTypeLabel)}</div>
-            <div className="font-medium text-[#0A0A0A]">{t(question.text)}</div>
+            <div className="text-xs text-[#8A8A8A] mb-0.5">{t(qTypeLabel)}</div>
+            <div className="font-medium text-[#1A1A1A]">{t(question.text)}</div>
           </div>
           {isOpen
-            ? <ChevronUp className="w-4 h-4 text-[#71717A] shrink-0 mt-1" />
-            : <ChevronDown className="w-4 h-4 text-[#71717A] shrink-0 mt-1" />}
+            ? <ChevronUp className="w-4 h-4 text-[#8A8A8A] shrink-0 mt-1" />
+            : <ChevronDown className="w-4 h-4 text-[#8A8A8A] shrink-0 mt-1" />}
         </div>
       </button>
 
@@ -1206,10 +1625,10 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
               {aggregation.type === 'rating' && (
                 <>
                   <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-3xl font-bold text-[#0A0A0A] tabular-nums leading-none">
+                    <span className="text-3xl font-bold text-[#1A1A1A] tabular-nums leading-none">
                       {aggregation.avg?.toFixed(1) ?? '—'}
                     </span>
-                    <span className="text-sm text-[#71717A]">/ 5 {t('average')}</span>
+                    <span className="text-sm text-[#8A8A8A]">/ 5 {t('average')}</span>
                   </div>
                   <div className="space-y-2">
                     {aggregation.distribution.map((item) => (
@@ -1224,8 +1643,34 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
                 </>
               )}
 
-              {aggregation.type === 'single' && (
+              {aggregation.type === 'scale' && (
+                <>
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="text-3xl font-bold text-[#1A1A1A] tabular-nums leading-none">
+                      {aggregation.avg?.toFixed(1) ?? '—'}
+                    </span>
+                    <span className="text-sm text-[#8A8A8A]">/ 5 {t('average')}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {aggregation.distribution.map((item) => (
+                      <DistributionRow
+                        key={item.value}
+                        label={`${item.value}`}
+                        count={item.count}
+                        pct={item.pct}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {(aggregation.type === 'single' || aggregation.type === 'multi') && (
                 <div className="space-y-2">
+                  {aggregation.type === 'multi' && (
+                    <div className="text-xs text-[#8A8A8A] mb-1">
+                      {t('Respondents could choose multiple options.')}
+                    </div>
+                  )}
                   {aggregation.distribution.map((item) => (
                     <DistributionRow
                       key={item.value}
@@ -1237,12 +1682,88 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
                 </div>
               )}
 
+              {aggregation.type === 'ranking' && (
+                <div className="space-y-2">
+                  <div className="text-xs text-[#8A8A8A] mb-1">
+                    {t('Sorted by average rank — lower is better.')}
+                  </div>
+                  {(aggregation.rankings ?? []).map((r, idx) => (
+                    <div
+                      key={r.value}
+                      className="flex items-center gap-3 px-3 py-2 border border-[#F3F3F3] rounded-md bg-white"
+                    >
+                      <span className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#F3F3F3] text-[#1A1A1A] text-xs font-semibold tabular-nums">
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm text-[#1A1A1A] flex-1 min-w-0">{r.value}</span>
+                      <span className="text-xs text-[#8A8A8A] tabular-nums shrink-0">
+                        {t('avg')} {r.avgRank.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {aggregation.type === 'date' && (
+                <div className="space-y-3">
+                  {aggregation.dateRange && (
+                    <div className="flex items-center gap-6 text-xs text-[#8A8A8A]">
+                      <span>
+                        {t('Earliest')}{' '}
+                        <span className="text-[#1A1A1A] font-medium tabular-nums">
+                          {aggregation.dateRange.first}
+                        </span>
+                      </span>
+                      <span>
+                        {t('Latest')}{' '}
+                        <span className="text-[#1A1A1A] font-medium tabular-nums">
+                          {aggregation.dateRange.last}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {aggregation.distribution.slice(0, 5).map((item) => (
+                      <DistributionRow
+                        key={item.value}
+                        label={item.value}
+                        count={item.count}
+                        pct={item.pct}
+                      />
+                    ))}
+                    {aggregation.distribution.length === 0 && (
+                      <div className="text-xs text-[#8A8A8A]">{t('No dates submitted yet.')}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {aggregation.type === 'matrix' && (
+                <div className="space-y-4">
+                  {(aggregation.matrixRows ?? []).map((mr) => (
+                    <div key={mr.row}>
+                      <div className="text-sm font-medium text-[#1A1A1A] mb-2">{mr.row}</div>
+                      <div className="space-y-1.5">
+                        {mr.distribution.map((item) => (
+                          <DistributionRow
+                            key={item.value}
+                            label={item.value}
+                            count={item.count}
+                            pct={item.pct}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {aggregation.type === 'text' && (
                 <div className="space-y-2">
                   {allTexts.slice(0, 3).map((text, i) => (
                     <div
                       key={i}
-                      className="bg-white border border-[#F4F4F5] rounded-md px-3 py-2 text-sm text-[#52525B] italic"
+                      className="bg-white border border-[#F3F3F3] rounded-md px-3 py-2 text-sm text-[#4A4A4A] italic"
                     >
                       “{text}”
                     </div>
@@ -1250,14 +1771,14 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
                   {allTexts.length > 3 && (
                     <button
                       onClick={() => setIsTextModalOpen(true)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-[#0A0A0A] hover:text-[#000000] transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-[#1A1A1A] hover:text-[#000000] transition-colors cursor-pointer"
                     >
                       + {allTexts.length - 3} {t('more written responses')}
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {allTexts.length === 0 && (
-                    <div className="text-xs text-[#71717A]">{t('No written responses yet.')}</div>
+                    <div className="text-xs text-[#8A8A8A]">{t('No written responses yet.')}</div>
                   )}
                 </div>
               )}
@@ -1273,7 +1794,7 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-[#0A0A0A]/30 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-[#1A1A1A]/30 flex items-center justify-center z-50 p-4"
             onClick={() => setIsTextModalOpen(false)}
           >
             <motion.div
@@ -1281,49 +1802,49 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
               transition={{ type: 'spring', duration: 0.3 }}
-              className="bg-white rounded-md w-full max-w-2xl border border-[#F4F4F5] flex flex-col max-h-[85vh] overflow-hidden"
+              className="bg-white rounded-md w-full max-w-2xl border border-[#F3F3F3] flex flex-col max-h-[85vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="px-6 py-4 border-b border-[#F4F4F5] shrink-0 flex items-start justify-between gap-4">
+              <div className="px-6 py-4 border-b border-[#F3F3F3] shrink-0 flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1 text-xs text-[#71717A]">
+                  <div className="flex items-center gap-2 mb-1 text-xs text-[#8A8A8A]">
                     <span>{t(qTypeLabel)}</span>
-                    <span className="text-[#D4D4D8]">·</span>
+                    <span className="text-[#D4D4D4]">·</span>
                     <span className="tabular-nums">{allTexts.length} {t('responses')}</span>
                   </div>
-                  <h2 className="text-lg font-semibold text-[#0A0A0A]">{t(question.text)}</h2>
+                  <h2 className="text-lg font-semibold text-[#1A1A1A]">{t(question.text)}</h2>
                 </div>
                 <button
                   onClick={() => setIsTextModalOpen(false)}
-                  className="text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5] rounded-md transition-colors p-1 cursor-pointer shrink-0"
+                  className="text-[#8A8A8A] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-md transition-colors p-1 cursor-pointer shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="px-6 py-3 border-b border-[#F4F4F5] shrink-0">
+              <div className="px-6 py-3 border-b border-[#F3F3F3] shrink-0">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8A8A]" />
                   <input
                     type="text"
                     value={textSearch}
                     onChange={(e) => setTextSearch(e.target.value)}
                     placeholder={t('Search within answers...')}
-                    className="w-full pl-9 pr-4 py-2 bg-white border border-[#E4E4E7] rounded-md text-sm focus:outline-none focus:border-[#FF3C21] focus:ring-1 focus:ring-[#FF3C21] placeholder:text-[#71717A]"
+                    className="w-full pl-9 pr-4 py-2 bg-white border border-[#E3E3E3] rounded-md text-sm focus:outline-none focus:border-[#FF3C21] focus:ring-1 focus:ring-[#FF3C21] placeholder:text-[#8A8A8A]"
                   />
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-2">
                 {filteredTexts.length === 0 ? (
-                  <div className="text-sm text-[#71717A] text-center py-8">
+                  <div className="text-sm text-[#8A8A8A] text-center py-8">
                     {t('No answers match your search.')}
                   </div>
                 ) : (
                   filteredTexts.map((text, i) => (
                     <div
                       key={i}
-                      className="bg-white border border-[#F4F4F5] rounded-md px-3 py-2 text-sm text-[#52525B] italic"
+                      className="bg-white border border-[#F3F3F3] rounded-md px-3 py-2 text-sm text-[#4A4A4A] italic"
                     >
                       “{text}”
                     </div>
@@ -1331,15 +1852,15 @@ function QuestionSummaryRow({ question, index, aggregation, isLast }: QuestionSu
                 )}
               </div>
 
-              <div className="px-6 py-3 border-t border-[#F4F4F5] bg-white shrink-0 flex items-center justify-between">
-                <span className="text-xs text-[#71717A] tabular-nums">
+              <div className="px-6 py-3 border-t border-[#F3F3F3] bg-white shrink-0 flex items-center justify-between">
+                <span className="text-xs text-[#8A8A8A] tabular-nums">
                   {textSearch
                     ? `${filteredTexts.length} ${t('of')} ${allTexts.length}`
                     : `${allTexts.length} ${t('total responses')}`}
                 </span>
                 <button
                   onClick={() => setIsTextModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-[#52525B] bg-white border border-[#E4E4E7] rounded-md hover:bg-[#F4F4F5] transition-colors shadow-none cursor-pointer"
+                  className="px-4 py-2 text-sm font-medium text-[#4A4A4A] bg-white border border-[#E3E3E3] rounded-md hover:bg-[#F3F3F3] transition-colors shadow-none cursor-pointer"
                 >
                   {t('Close')}
                 </button>
@@ -1358,16 +1879,124 @@ interface DistributionRowProps {
   pct: number;
 }
 
+const TRUST_LABEL: Record<number, string> = {
+  1: 'Newcomer',
+  2: 'Verified',
+  3: 'Trusted',
+  4: 'Expert',
+  5: 'Elite',
+};
+
+function RespondentProfileCard({ profile }: { profile: RespondentProfile }) {
+  const { t } = useTranslation();
+  return (
+    <div className="bg-white rounded-md border border-[#E3E3E3] overflow-hidden">
+      <div className="px-5 py-3 border-b border-[#F3F3F3] flex items-center justify-between">
+        <h3 className="text-[11px] font-medium text-[#8A8A8A] uppercase tracking-wider">
+          {t('Respondent Profile')}
+        </h3>
+        <span
+          className="inline-flex items-center gap-1 text-[11px] text-[#8A8A8A]"
+          title={t('Identity is hidden to protect respondent privacy. Only anonymized traits are shown.')}
+        >
+          <Shield className="w-3 h-3" />
+          {t('Anonymized')}
+        </span>
+      </div>
+
+      {/* Trust level highlight */}
+      <div className="px-5 py-4 border-b border-[#F3F3F3] flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-[#FFF1EE] text-[#FF3C21] flex items-center justify-center shrink-0">
+          <Shield className="w-5 h-5" strokeWidth={1.75} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-[#1A1A1A]">
+            {t('Level')} {profile.trustLevel} — {t(TRUST_LABEL[profile.trustLevel])}
+          </div>
+          <div className="text-xs text-[#8A8A8A]">
+            {t('Member for')} {profile.memberSinceLabel}
+          </div>
+        </div>
+      </div>
+
+      {/* Traits grid */}
+      <div className="grid grid-cols-2 divide-x divide-[#F3F3F3]">
+        <ProfileTrait
+          icon={<UserCircle2 className="w-4 h-4" />}
+          label={t('Demographics')}
+          value={`${profile.ageBracket} · ${t(profile.gender)}`}
+        />
+        <ProfileTrait
+          icon={<MapPin className="w-4 h-4" />}
+          label={t('Region')}
+          value={`${t(profile.region)} · ${t(profile.district)}`}
+        />
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-[#F3F3F3] border-t border-[#F3F3F3]">
+        <ProfileTrait
+          icon={<GraduationCap className="w-4 h-4" />}
+          label={t('Education')}
+          value={t(profile.education)}
+        />
+        <ProfileTrait
+          icon={<Briefcase className="w-4 h-4" />}
+          label={t('Employment')}
+          value={t(profile.employment)}
+        />
+      </div>
+      <div className="border-t border-[#F3F3F3]">
+        <ProfileTrait
+          icon={<Wallet className="w-4 h-4" />}
+          label={t('Monthly household income')}
+          value={t(profile.incomeBracket)}
+        />
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-[#F3F3F3] border-t border-[#F3F3F3]">
+        <ProfileTrait
+          icon={<ClipboardCheck className="w-4 h-4" />}
+          label={t('Surveys completed')}
+          value={profile.surveysCompleted.toLocaleString()}
+        />
+        <ProfileTrait
+          icon={<TrendingUp className="w-4 h-4" />}
+          label={t('Avg quality')}
+          value={`${profile.avgQualityScore} / 100`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProfileTrait({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="px-5 py-3">
+      <div className="flex items-center gap-1.5 text-[11px] text-[#8A8A8A] mb-0.5">
+        <span className="text-[#B5B5B5]">{icon}</span>
+        <span>{label}</span>
+      </div>
+      <div className="text-sm font-medium text-[#1A1A1A] truncate">{value}</div>
+    </div>
+  );
+}
+
 function DistributionRow({ label, count, pct }: DistributionRowProps) {
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1 gap-4">
-        <span className="text-sm text-[#0A0A0A] min-w-0 truncate">{label}</span>
-        <span className="text-xs text-[#71717A] tabular-nums shrink-0">
+        <span className="text-sm text-[#1A1A1A] min-w-0 truncate">{label}</span>
+        <span className="text-xs text-[#8A8A8A] tabular-nums shrink-0">
           {count} ({pct.toFixed(0)}%)
         </span>
       </div>
-      <div className="h-1.5 bg-[#F4F4F5] rounded-full overflow-hidden">
+      <div className="h-1.5 bg-[#F3F3F3] rounded-full overflow-hidden">
         <div
           className="h-full bg-[#FF3C21] rounded-full transition-[width]"
           style={{ width: `${pct}%` }}
@@ -1386,17 +2015,17 @@ interface StatTileProps {
 
 function StatTile({ icon, tone, value, label }: StatTileProps) {
   const tones: Record<StatTileProps['tone'], string> = {
-    neutral: 'bg-[#F4F4F5] text-[#52525B]',
-    brand:   'bg-[#F4F4F5] text-[#0A0A0A]',
+    neutral: 'bg-[#F3F3F3] text-[#4A4A4A]',
+    brand:   'bg-[#F3F3F3] text-[#1A1A1A]',
     amber:   'bg-[#FFFBEB] text-[#B45309]',
   };
   return (
-    <div className="flex flex-col items-center justify-center p-3 border border-[#F4F4F5] rounded-md text-center">
+    <div className="flex flex-col items-center justify-center p-3 border border-[#F3F3F3] rounded-md text-center">
       <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 ${tones[tone]}`}>
         {icon}
       </div>
-      <div className="text-sm font-semibold text-[#0A0A0A] tabular-nums">{value}</div>
-      <div className="text-[11px] text-[#71717A] mt-0.5">{label}</div>
+      <div className="text-sm font-semibold text-[#1A1A1A] tabular-nums">{value}</div>
+      <div className="text-[11px] text-[#8A8A8A] mt-0.5">{label}</div>
     </div>
   );
 }
@@ -1404,8 +2033,8 @@ function StatTile({ icon, tone, value, label }: StatTileProps) {
 function DetailRow({ label, value }: DetailRowProps) {
   return (
     <div className="flex justify-between items-baseline gap-4">
-      <dt className="text-[#71717A]">{label}</dt>
-      <dd className="text-[#0A0A0A] font-medium text-right">{value}</dd>
+      <dt className="text-[#8A8A8A]">{label}</dt>
+      <dd className="text-[#1A1A1A] font-medium text-right">{value}</dd>
     </div>
   );
 }

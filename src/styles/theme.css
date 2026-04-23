@@ -1,49 +1,75 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-serif: Georgia, 'Times New Roman', Cambria, serif;
+  --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Soften default weight utilities for a cleaner, modern feel.
+     font-bold → 600 (was 700), font-semibold → 500 (was 600). */
+  --font-weight-bold: 600;
+  --font-weight-semibold: 500;
+  --font-weight-extrabold: 700;
+  --font-weight-black: 800;
 }
 
 :root {
   --font-size: 16px;
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
+
+  /* Sand — neutral scale (16 steps) */
+  --sand-1: #FFFFFF;
+  --sand-2: #FDFDFD;
+  --sand-3: #FAFAFA;
+  --sand-4: #F7F7F7;
+  --sand-5: #F3F3F3;
+  --sand-6: #F1F1F1;
+  --sand-7: #EBEBEB;
+  --sand-8: #E3E3E3;
+  --sand-9: #D4D4D4;
+  --sand-10: #CCCCCC;
+  --sand-11: #B5B5B5;
+  --sand-12: #8A8A8A;
+  --sand-13: #616161;
+  --sand-14: #4A4A4A;
+  --sand-15: #303030;
+  --sand-16: #1A1A1A;
+
+  --background: var(--sand-1);
+  --foreground: var(--sand-16);
+  --card: var(--sand-1);
+  --card-foreground: var(--sand-16);
+  --popover: var(--sand-1);
+  --popover-foreground: var(--sand-16);
+  --primary: var(--sand-16);
+  --primary-foreground: var(--sand-1);
+  --secondary: var(--sand-5);
+  --secondary-foreground: var(--sand-16);
+  --muted: var(--sand-7);
+  --muted-foreground: var(--sand-12);
+  --accent: var(--sand-7);
+  --accent-foreground: var(--sand-16);
   --destructive: #d4183d;
-  --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
+  --destructive-foreground: var(--sand-1);
+  --border: var(--sand-8);
   --input: transparent;
-  --input-background: #f3f3f5;
-  --switch-background: #cbced4;
+  --input-background: var(--sand-5);
+  --switch-background: var(--sand-10);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: oklch(0.708 0 0);
+  --ring: var(--sand-11);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.875rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #030213;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: var(--sand-3);
+  --sidebar-foreground: var(--sand-16);
+  --sidebar-primary: var(--sand-16);
+  --sidebar-primary-foreground: var(--sand-1);
+  --sidebar-accent: var(--sand-5);
+  --sidebar-accent-foreground: var(--sand-16);
+  --sidebar-border: var(--sand-8);
+  --sidebar-ring: var(--sand-11);
 }
 
 .dark {
