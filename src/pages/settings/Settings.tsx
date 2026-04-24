@@ -4,7 +4,7 @@ import {
   Search, ExternalLink, ChevronDown, Upload, Trash2,
   UserCircle, Bell, Globe, Building2,
   Plus, Check, Mail,
-  Coins, Image as ImageIcon, Eye, EyeOff, Wallet, ShieldCheck, Monitor,
+  Image as ImageIcon, Eye, EyeOff, Wallet, ShieldCheck, Monitor,
   CreditCard, Building, Smartphone, Star, Download,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -30,32 +30,97 @@ export default function Settings() {
     () => [
       {
         category: t('Personal'),
-        items: [{ id: 'Account' as const, label: t('Account'), icon: UserCircle }],
+        items: [
+          {
+            id: 'Account' as const,
+            label: t('Account'),
+            icon: UserCircle,
+            keywords: [
+              'profile', 'photo', 'avatar', 'first name', 'last name', 'job title',
+              'country', 'city', 'email', 'password', 'login', 'mfa', '2fa',
+              'two-factor', 'authenticator', 'delete account', 'danger zone',
+            ],
+          },
+        ],
       },
       {
         category: t('Workspace'),
         items: [
-          { id: 'Organisation' as const, label: t('Organisation'), icon: Building2 },
+          {
+            id: 'Organisation' as const,
+            label: t('Organisation'),
+            icon: Building2,
+            keywords: [
+              'organisation', 'organization', 'org', 'company', 'workspace',
+              'industry', 'size', 'team', 'members', 'logo', 'brand',
+              'respondent region', 'market', 'mongolia',
+            ],
+          },
         ],
       },
       {
         category: t('Payments'),
         items: [
-          { id: 'Payment methods' as const, label: t('Payment methods'), icon: Wallet },
+          {
+            id: 'Payment methods' as const,
+            label: t('Payment methods'),
+            icon: Wallet,
+            keywords: [
+              'card', 'credit card', 'debit', 'visa', 'mastercard', 'bank',
+              'qpay', 'bonum', 'mobile banking', 'billing', 'invoice',
+              'receipt', 'top up', 'topup', 'credits', 'default method',
+            ],
+          },
         ],
       },
       {
         category: t('Preferences'),
         items: [
-          { id: 'Notifications' as const, label: t('Notifications'), icon: Bell },
-          { id: 'Language & region' as const, label: t('Language & region'), icon: Globe },
+          {
+            id: 'Notifications' as const,
+            label: t('Notifications'),
+            icon: Bell,
+            keywords: [
+              'email', 'in-app', 'push', 'alerts', 'digest', 'daily', 'weekly',
+              'quiet hours', 'survey milestone', 'response target', 'reward',
+              'low credit', 'invoice reminder', 'mute', 'sound',
+            ],
+          },
+          {
+            id: 'Language & region' as const,
+            label: t('Language & region'),
+            icon: Globe,
+            keywords: [
+              'language', 'locale', 'english', 'korean', 'french', 'spanish',
+              'timezone', 'time zone', 'utc', 'date format', 'time format',
+              '12-hour', '24-hour', 'currency', 'mnt',
+            ],
+          },
         ],
       },
       {
         category: t('Privacy & security'),
         items: [
-          { id: 'Privacy & data' as const, label: t('Privacy & data'), icon: ShieldCheck },
-          { id: 'Sessions' as const, label: t('Sessions'), icon: Monitor },
+          {
+            id: 'Privacy & data' as const,
+            label: t('Privacy & data'),
+            icon: ShieldCheck,
+            keywords: [
+              'data export', 'download data', 'retention', 'gdpr', 'consent',
+              'third party', 'analytics', 'cookies', 'tracking', 'marketing',
+              'usage policy', 'terms',
+            ],
+          },
+          {
+            id: 'Sessions' as const,
+            label: t('Sessions'),
+            icon: Monitor,
+            keywords: [
+              'device', 'browser', 'ip address', 'location', 'last active',
+              'sign out', 'log out', 'logout', 'revoke', 'active session',
+              'trusted device',
+            ],
+          },
         ],
       },
     ],
@@ -66,9 +131,21 @@ export default function Settings() {
     const q = search.trim().toLowerCase();
     if (!q) return navigation;
     return navigation
-      .map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(q)) }))
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((i) => {
+          if (i.label.toLowerCase().includes(q)) return true;
+          return i.keywords?.some((k) => k.toLowerCase().includes(q)) ?? false;
+        }),
+      }))
       .filter((g) => g.items.length > 0);
   }, [navigation, search]);
+
+  const trimmedSearch = search.trim();
+  const matchCount = useMemo(
+    () => filteredNav.reduce((sum, g) => sum + g.items.length, 0),
+    [filteredNav],
+  );
 
   const activeCategory =
     navigation.find((g) => g.items.some((i) => i.id === activeSection))?.category ?? '';
@@ -84,16 +161,39 @@ export default function Settings() {
       <div className="w-full md:w-64 border-r border-[#E3E3E3] bg-white flex flex-col shrink-0 h-full overflow-y-auto">
         <div className="p-4 shrink-0">
           <h2 className="text-lg font-medium text-[#1A1A1A] mb-4">{t('Settings')}</h2>
-          <div className="relative">
+          <div
+            className={cn(
+              'relative rounded-md border bg-white transition-colors',
+              trimmedSearch ? 'border-[#FF3C21]' : 'border-[#E3E3E3] focus-within:border-[#FF3C21]',
+            )}
+          >
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8A8A]" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('Search')}
-              className="w-full pl-9 pr-3 py-2 bg-white border border-[#E3E3E3] rounded-md text-sm text-[#1A1A1A] placeholder:text-[#8A8A8A] focus:outline-none focus:border-[#FF3C21] transition-colors"
+              className="w-full pl-9 pr-9 py-2 bg-transparent rounded-md text-sm text-[#1A1A1A] placeholder:text-[#8A8A8A] focus:outline-none"
             />
+            {trimmedSearch && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label={t('Clear search')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#8A8A8A] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-sm transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
+          {trimmedSearch && (
+            <div className="mt-3 text-xs text-[#8A8A8A]">
+              {matchCount === 0
+                ? t('No results for')
+                : t('{{count}} results for', { count: matchCount, defaultValue: `${matchCount} results for` })}{' '}
+              <span className="text-[#1A1A1A] font-medium">"{trimmedSearch}"</span>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 px-2 pb-4 space-y-6">
@@ -120,7 +220,7 @@ export default function Settings() {
                       <Icon
                         className={cn('w-4 h-4', isActive ? 'text-[#FF3C21]' : 'text-[#8A8A8A]')}
                       />
-                      {item.label}
+                      <HighlightedLabel text={item.label} query={trimmedSearch} />
                     </button>
                   );
                 })}
@@ -182,6 +282,20 @@ export default function Settings() {
 }
 
 /* ---------- Shared field primitives ---------- */
+
+function HighlightedLabel({ text, query }: { text: string; query: string }) {
+  const q = query.trim();
+  if (!q) return <>{text}</>;
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="text-[#FF3C21] font-semibold">{text.slice(idx, idx + q.length)}</span>
+      {text.slice(idx + q.length)}
+    </>
+  );
+}
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-sm font-medium text-[#1A1A1A] mb-2">{children}</label>;
@@ -1160,14 +1274,14 @@ function NotificationsSection() {
 
 function LanguageRegionSection() {
   const { t, i18n } = useTranslation();
-  const [dateFormat, setDateFormat] = useState('YYYY-MM-DD');
   const [timezone, setTimezone] = useState('Asia/Ulaanbaatar');
-  const [firstDay, setFirstDay] = useState('monday');
+  const [dateFormat, setDateFormat] = useState('MMM d, yyyy');
+  const [timeFormat, setTimeFormat] = useState('24h');
 
   return (
-    <div className="space-y-8 pb-20">
-      <SectionCard title={t('Display')}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div className="space-y-6 pb-20">
+      <div className="bg-white border border-[#E3E3E3] rounded-md p-6 md:p-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
           <div>
             <FieldLabel>{t('Display language')}</FieldLabel>
             <p className="text-xs text-[#8A8A8A] mb-3">
@@ -1180,31 +1294,12 @@ function LanguageRegionSection() {
               <option value="ko">한국어</option>
             </NativeSelect>
           </div>
-          <div>
-            <FieldLabel>{t('First day of the week')}</FieldLabel>
-            <p className="text-xs text-[#8A8A8A] mb-3">
-              {t('Used in calendars and date range pickers.')}
-            </p>
-            <NativeSelect value={firstDay} onChange={setFirstDay}>
-              <option value="monday">{t('Monday')}</option>
-              <option value="sunday">{t('Sunday')}</option>
-            </NativeSelect>
-          </div>
-        </div>
-      </SectionCard>
 
-      <SectionCard title={t('Date & time')}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
-            <FieldLabel>{t('Date format')}</FieldLabel>
-            <NativeSelect value={dateFormat} onChange={setDateFormat}>
-              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-            </NativeSelect>
-          </div>
-          <div>
-            <FieldLabel>{t('Time zone')}</FieldLabel>
+            <FieldLabel>{t('Timezone')}</FieldLabel>
+            <p className="text-xs text-[#8A8A8A] mb-3">
+              {t('Used for survey schedules and invoice dates.')}
+            </p>
             <NativeSelect value={timezone} onChange={setTimezone}>
               <option value="Asia/Ulaanbaatar">Asia/Ulaanbaatar (UTC+8)</option>
               <option value="Asia/Seoul">Asia/Seoul (UTC+9)</option>
@@ -1213,25 +1308,30 @@ function LanguageRegionSection() {
               <option value="America/New_York">America/New_York (UTC−5)</option>
             </NativeSelect>
           </div>
-        </div>
-      </SectionCard>
 
-      <SectionCard title={t('Currency')}>
-        <div className="flex items-start justify-between gap-6">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-medium text-[#1A1A1A]">
-              <Coins className="w-4 h-4 text-[#FF3C21]" />
-              {t('Mongolian Tögrög (₮ MNT)')}
-            </div>
-            <p className="text-xs text-[#8A8A8A] mt-1">
-              {t('Workspace billing currency. Contact support to change.')}
-            </p>
+          <div>
+            <FieldLabel>{t('Date format')}</FieldLabel>
+            <NativeSelect value={dateFormat} onChange={setDateFormat}>
+              <option value="MMM d, yyyy">MMM d, yyyy</option>
+              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+            </NativeSelect>
           </div>
-          <span className="px-2 py-0.5 rounded-md bg-[#F3F3F3] text-[#4A4A4A] text-[11px] font-medium shrink-0">
-            {t('Workspace setting')}
-          </span>
+
+          <div>
+            <FieldLabel>{t('Time format')}</FieldLabel>
+            <NativeSelect value={timeFormat} onChange={setTimeFormat}>
+              <option value="24h">{t('24-hour')} (14:30)</option>
+              <option value="12h">{t('12-hour')} (2:30 PM)</option>
+            </NativeSelect>
+          </div>
         </div>
-      </SectionCard>
+      </div>
+
+      <p className="text-xs text-[#8A8A8A] px-1">
+        {t('Workspace currency is ₮ MNT. Contact support to change.')}
+      </p>
     </div>
   );
 }
