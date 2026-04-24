@@ -21,12 +21,20 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
+import { useAuth } from '@/shared/lib/auth';
 
 export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onToggle: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const logout = useAuth((s) => s.logout);
+  const userEmail = useAuth((s) => s.email);
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
   const [hasUnread, setHasUnread] = React.useState(true);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <>
@@ -163,25 +171,36 @@ export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onTog
           <div className="absolute left-full bottom-0 ml-2 w-56 bg-white border border-[#E3E3E3] rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 p-1.5 flex flex-col gap-0.5">
             <div className="px-2.5 py-2 mb-1">
               <span className="block text-sm font-medium text-[#1A1A1A] truncate">Hein's Org</span>
-              <span className="block text-xs text-[#8A8A8A] truncate">Growth plan · Hein Htet</span>
+              <span className="block text-xs text-[#8A8A8A] truncate">
+                {userEmail ? `Growth plan · ${userEmail}` : 'Growth plan · Hein Htet'}
+              </span>
             </div>
-            
+
             <div className="h-px bg-[#E3E3E3] mx-1 mb-1"></div>
-            
-            <button className="w-full text-left px-2.5 py-1.5 text-sm font-medium text-[#3F3F46] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-sm transition-colors flex items-center gap-2.5">
+
+            <button
+              onClick={() => navigate('/settings')}
+              className="w-full text-left px-2.5 py-1.5 text-sm font-medium text-[#3F3F46] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-sm transition-colors flex items-center gap-2.5 cursor-pointer"
+            >
               <Settings className="w-4 h-4 text-[#8A8A8A]" />
-              Account Settings
+              {t('Account Settings')}
             </button>
-            <button className="w-full text-left px-2.5 py-1.5 text-sm font-medium text-[#3F3F46] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-sm transition-colors flex items-center gap-2.5">
+            <button
+              onClick={() => navigate('/help')}
+              className="w-full text-left px-2.5 py-1.5 text-sm font-medium text-[#3F3F46] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-sm transition-colors flex items-center gap-2.5 cursor-pointer"
+            >
               <HelpCircle className="w-4 h-4 text-[#8A8A8A]" />
-              Support
+              {t('Support')}
             </button>
-            
+
             <div className="h-px bg-[#E3E3E3] mx-1 my-1"></div>
-            
-            <button className="w-full text-left px-2.5 py-1.5 text-sm font-medium text-[#8A8A8A] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-sm transition-colors flex items-center gap-2.5">
+
+            <button
+              onClick={handleLogout}
+              className="w-full text-left px-2.5 py-1.5 text-sm font-medium text-[#8A8A8A] hover:text-[#1A1A1A] hover:bg-[#F3F3F3] rounded-sm transition-colors flex items-center gap-2.5 cursor-pointer"
+            >
               <LogOut className="w-4 h-4" />
-              Log out
+              {t('Log out')}
             </button>
           </div>
         </div>

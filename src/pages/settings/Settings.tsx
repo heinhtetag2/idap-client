@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
   Search, ExternalLink, ChevronDown, Upload, Trash2,
   UserCircle, Bell, Globe, Building2,
   Plus, Check, Mail,
   Image as ImageIcon, Eye, EyeOff, Wallet, ShieldCheck, Monitor,
-  CreditCard, Building, Smartphone, Star, Download,
+  CreditCard, Building, Smartphone, Star, Download, LogOut,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/shared/lib/cn';
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from '@/shared/ui/drawer';
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
 import { X } from 'lucide-react';
+import { useAuth } from '@/shared/lib/auth';
 
 type SectionId =
   | 'Account'
@@ -470,12 +473,21 @@ function SettingsDrawer({
 
 function AccountSection() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const logout = useAuth((s) => s.logout);
+  const userEmail = useAuth((s) => s.email);
   const [firstName, setFirstName] = useState('Hein');
   const [lastName, setLastName] = useState('Htet');
   const [jobTitle, setJobTitle] = useState('Research Lead');
   const [country, setCountry] = useState('Mongolia');
   const [city, setCity] = useState('Ulaanbaatar');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="space-y-8 pb-20">
@@ -539,6 +551,31 @@ function AccountSection() {
 
       <LoginDetailsCard />
 
+      <SectionCard title={t('Log out')}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="min-w-0">
+            <span className="block text-sm font-medium text-[#1A1A1A] mb-1">
+              {t('Log out of this device')}
+            </span>
+            <p className="text-sm text-[#8A8A8A]">
+              {userEmail
+                ? t("You're signed in as {{email}}. Sign out to return to the login screen.", {
+                    email: userEmail,
+                    defaultValue: `You're signed in as ${userEmail}. Sign out to return to the login screen.`,
+                  })
+                : t('Sign out to return to the login screen.')}
+            </p>
+          </div>
+          <button
+            onClick={() => setLogoutOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E3E3E3] rounded-md text-sm font-medium text-[#1A1A1A] bg-white hover:bg-[#F3F3F3] transition-colors shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 text-[#8A8A8A]" />
+            {t('Log out')}
+          </button>
+        </div>
+      </SectionCard>
+
       <SectionCard title={t('Delete account')} danger>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div>
@@ -558,6 +595,34 @@ function AccountSection() {
       </SectionCard>
 
       <DeleteAccountDrawer open={deleteOpen} onClose={() => setDeleteOpen(false)} />
+
+      <ConfirmDialog
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        title={t('Log out of this device?')}
+        description={t('You will be returned to the sign-in screen.')}
+        secondaryAction={{ label: t('Cancel'), onClick: () => setLogoutOpen(false) }}
+        primaryAction={{
+          label: t('Log out'),
+          onClick: () => {
+            setLogoutOpen(false);
+            handleLogout();
+          },
+          danger: true,
+        }}
+      >
+        <div className="rounded-md border border-[#E3E3E3] bg-[#FAFAFA] p-4 text-sm text-[#4A4A4A]">
+          {userEmail
+            ? t('You are currently signed in as {{email}}.', {
+                email: userEmail,
+                defaultValue: `You are currently signed in as ${userEmail}.`,
+              })
+            : t('You are currently signed in to this workspace.')}
+        </div>
+        <p className="text-xs text-[#8A8A8A] mt-3">
+          {t('Other browsers and devices where you are signed in will stay active.')}
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }
@@ -2043,6 +2108,9 @@ function RequestExportDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
 function SessionsSection() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const logout = useAuth((s) => s.logout);
+  const userEmail = useAuth((s) => s.email);
   const [sessions, setSessions] = useState([
     { id: 's1', device: 'MacBook Pro · Chrome', location: 'Ulaanbaatar, MN', lastActive: t('Active now'), current: true },
     { id: 's2', device: 'iPhone 15 · Safari', location: 'Ulaanbaatar, MN', lastActive: t('2 hours ago'), current: false },
@@ -2050,10 +2118,16 @@ function SessionsSection() {
   ]);
 
   const [confirmAllOpen, setConfirmAllOpen] = useState(false);
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   const signOut = (id: string) => setSessions((ss) => ss.filter((s) => s.id !== id));
   const signOutOthers = () => setSessions((ss) => ss.filter((s) => s.current));
   const hasOthers = sessions.some((s) => !s.current);
   const otherCount = sessions.filter((s) => !s.current).length;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -2101,6 +2175,32 @@ function SessionsSection() {
         </button>
       )}
 
+      <div className="pt-4 border-t border-[#E3E3E3]">
+        <h3 className="text-lg font-medium text-[#1A1A1A] mb-4">{t('Log out')}</h3>
+        <div className="bg-white border border-[#E3E3E3] rounded-md p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <span className="block text-sm font-medium text-[#1A1A1A] mb-1">
+              {t('Log out of this device')}
+            </span>
+            <p className="text-sm text-[#8A8A8A]">
+              {userEmail
+                ? t("You're signed in as {{email}}. Sign out to return to the login screen.", {
+                    email: userEmail,
+                    defaultValue: `You're signed in as ${userEmail}. Sign out to return to the login screen.`,
+                  })
+                : t('Sign out to return to the login screen.')}
+            </p>
+          </div>
+          <button
+            onClick={() => setConfirmLogoutOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E3E3E3] rounded-md text-sm font-medium text-[#1A1A1A] bg-white hover:bg-[#F3F3F3] transition-colors shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 text-[#8A8A8A]" />
+            {t('Log out')}
+          </button>
+        </div>
+      </div>
+
       <SettingsDrawer
         open={confirmAllOpen}
         onClose={() => setConfirmAllOpen(false)}
@@ -2125,6 +2225,34 @@ function SessionsSection() {
           {t('Anyone signed in on those devices will need to log in again.')}
         </p>
       </SettingsDrawer>
+
+      <ConfirmDialog
+        open={confirmLogoutOpen}
+        onClose={() => setConfirmLogoutOpen(false)}
+        title={t('Log out of this device?')}
+        description={t('You will be returned to the sign-in screen.')}
+        secondaryAction={{ label: t('Cancel'), onClick: () => setConfirmLogoutOpen(false) }}
+        primaryAction={{
+          label: t('Log out'),
+          onClick: () => {
+            setConfirmLogoutOpen(false);
+            handleLogout();
+          },
+          danger: true,
+        }}
+      >
+        <div className="rounded-md border border-[#E3E3E3] bg-[#FAFAFA] p-4 text-sm text-[#4A4A4A]">
+          {userEmail
+            ? t('You are currently signed in as {{email}}.', {
+                email: userEmail,
+                defaultValue: `You are currently signed in as ${userEmail}.`,
+              })
+            : t('You are currently signed in to this workspace.')}
+        </div>
+        <p className="text-xs text-[#8A8A8A] mt-3">
+          {t('Other browsers and devices where you are signed in will stay active.')}
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }
